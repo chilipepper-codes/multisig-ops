@@ -217,7 +217,8 @@ Options, in increasing custom code:
    the Squads multisig): the most faithful to the EVM design, and custom
    Rust with an audit.
 
-Recommendation for the first phase: option 1 with a small hot balance, the
-app's key on KMS, and a testnet trial of option 3 as soon as Squads' policy
-documentation is in hand; option 4 only if neither 2 nor 3 can express the
-swap-only rule.
+**Owner's call, 2026-10-24: option 1 is out.** There is no on-chain vault on
+Solana, only trading wallets, so the trading wallet itself must carry the
+two-key withdrawal rule, which leaves options 2, 3 and 4 — or another
+solution found when the work is taken up. No decision yet; the roadmap
+carries the open question.

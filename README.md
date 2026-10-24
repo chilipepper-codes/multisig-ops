@@ -7,7 +7,8 @@ that proves what each policy allows and refuses.
 
 **Start here:** [`docs/decisions/001-custody-design.md`](docs/decisions/001-custody-design.md)
 — the design, what it meets, what it does not, and what is verified before any
-real funds move.
+real funds move — then [`docs/roadmap.md`](docs/roadmap.md) for the build
+order and what is queued without a decision (Solana).
 
 ## Rules
 
