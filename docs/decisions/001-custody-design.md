@@ -67,10 +67,24 @@ session notes):
   chain; a token allowlist; per-period allowances; one transfer target outside
   the Safe, the Hyperliquid deposit account below, under an allowance. A
   transfer to any other address is not a role call: it needs two owners.
-- **Delay on the owner path** of the trading Safe (a day or two of cooldown,
-  cancellable by one key or the off-site third party), so a coerced two-key
-  withdrawal needs the attacker to hold the owner for the whole delay. Role
-  calls bypass the delay by design.
+- **A cooldown on withdrawals — open choice, corrected 2026-10-24.** The
+  Delay modifier delays only what reaches the Safe *through it as a module*;
+  owners who sign directly are never delayed (Zodiac's own docs). So "a
+  delay on the two-key path" is one of two constructions, not a setting:
+  - **(a) No delay.** The two owners sign directly; the wrench defence is the
+    vault key alone. Simplest, nothing can brick the Safe.
+  - **(b) The owner path routed through Delay.** The vault Safe (2 of 3) is
+    the module enabled on the trading Safe's Delay; the trading Safe's own
+    owner set is made unable to sign (its single owner the Delay contract,
+    which cannot produce a signature), so every non-role action — a
+    withdrawal, a policy change — is queued by the vault Safe, waits the
+    cooldown (a day or two), and can be cancelled during it by the Delay's
+    owner (the home key, or the off-site third party). A coerced two-key
+    withdrawal then needs the attacker to hold the owner for the whole
+    delay. Cost: the trading Safe has no direct owner path at all, so a
+    Delay bug or a stuck queue needs the queue's own skip (`setTxNonce`) or
+    the expiration to clear; rehearse both on a fork before choosing it.
+  Role calls bypass the delay in both constructions by design.
 - **Swaps, v3 first.** On chains with CoW Swap, the CoW presets (Safe signs the
   order, Roles scopes the message). On Robinhood Chain, Uniswap v3's
   SwapRouter02 with the recipient pinned: standard conditions, **no custom
@@ -156,7 +170,15 @@ session notes):
   the same way; Hyperliquid deposits from the app; Hyperliquid trading with
   the browser agent. **Rare, with the vault key:** withdrawing from
   Hyperliquid, topping up the trading Safe, moving anything out of either
-  Safe (two owners in Safe{Wallet} or Rabby's Safe mode, then the cooldown).
+  Safe (two owners in Safe{Wallet} or Rabby's Safe mode; under construction
+  (b) above, queued through the Delay and executed after the cooldown).
+- **Changing the policy** (a new router or bridge on the allowlist, a
+  token, an allowance) is itself a non-role action: the Roles modifier's
+  configuration is owner-only and its owner is the trading Safe, so a
+  change is a Safe transaction by two owners (and, under (b), through the
+  cooldown). A role member cannot widen its own role — the point of the
+  design, and the reason allowlist changes are batched for the vault key's
+  visits.
 - Under a wrench attack the home key alone can trade within the allowlists
   and move money between the owner's own addresses, including the
   Hyperliquid deposit account up to its allowance. It cannot send anything
