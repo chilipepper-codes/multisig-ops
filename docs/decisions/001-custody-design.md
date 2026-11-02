@@ -1,6 +1,7 @@
 # ADR-001: Wrench-resistant self-custody for a trading book — Safe + Roles on EVM, native multi-sig on Hyperliquid, a hardware key for the app
 
-**Status:** accepted as the design (owner, 2026-10-24); nothing built yet. Solana is
+**Status:** accepted as the design (owner, 2026-10-24); amended 2026-11-02 to
+scope CLMM range orders into the trader role; nothing built yet. Solana is
 **proposed**, not decided (last section). Every "verify" line below is a
 testnet or fork step that precedes real funds.
 
@@ -65,8 +66,33 @@ session notes):
   routers, bridges and Permit2; swaps whose recipient is pinned to the Safe
   (`c.avatar`); bridges whose destination is the Safe's address on the other
   chain; a token allowlist; per-period allowances; one transfer target outside
-  the Safe, the Hyperliquid deposit account below, under an allowance. A
+  the Safe, the Hyperliquid deposit account below, under an allowance; and
+  concentrated-liquidity positions owned by the Safe (next bullet). A
   transfer to any other address is not a role call: it needs two owners.
+- **CLMM range orders (amended 2026-11-02).** The execution engine rests its
+  limit orders as single-sided concentrated-liquidity positions: a range
+  entirely above the price sells through it, one entirely below buys through
+  it, and the position earns the pool fee from the flow that fills it. A
+  position is not a swap, so the role names the position manager as a
+  target of its own, on every chain with a v3-shaped one (Uniswap v3's
+  NonfungiblePositionManager; Aerodrome Slipstream on Base; PancakeSwap v3;
+  Camelot on Arbitrum). What the role allows on it, and nothing else: an
+  ERC-20 approval to it (v3 pulls with `transferFrom`, not Permit2);
+  `mint` with the recipient pinned to the Safe and both tokens on the
+  allowlist; `decreaseLiquidity` (moves nothing); `collect` with the
+  recipient pinned to the Safe, `address(0)` rejected (it means "collect
+  into the manager" for a later sweep); `burn`; native value always zero
+  (WETH is a listed token). Denied, and on the must-fail list, because the
+  position NFT is funds: `approve`, `setApprovalForAll`, `transferFrom` and
+  both `safeTransferFrom` overloads; `multicall` (Roles cannot see inside
+  it; a cycle of decrease, collect, burn and the next mint goes through the
+  Safe's MultiSend, which Roles unwraps, as one role call); `sweepToken`,
+  `unwrapWETH9`, `refundETH` and the permit variants. Role calls bypass the
+  Delay, which the mechanism needs: a filled range un-fills if the price
+  crosses back before the proceeds are collected. The engine's own rules
+  (rung sizing, icebergs, reload cycles, the mint's minimum set equal to
+  the amount offered so a range the price has already entered reverts) are
+  the tracker's, recorded in its execution-engine ADR.
 - **A cooldown on withdrawals — open choice, corrected 2026-10-24.** The
   Delay modifier delays only what reaches the Safe *through it as a module*;
   owners who sign directly are never delayed (Zodiac's own docs). So "a
@@ -94,7 +120,12 @@ session notes):
   input, calls an allowlisted router, delivers the whole output to the Safe,
   reverts otherwise) is written and audited. Decide (a) or (b) only after
   measuring, over a few weeks, how much of the Robinhood Chain flow needs
-  v4-only pools. Until then, v4-only trades are not role trades.
+  v4-only pools. Until then, v4-only trades are not role trades. The same
+  holds for range orders: the v4 PositionManager takes nested action bytes
+  through `modifyLiquidities`, and a v4 hook can touch position liquidity,
+  so v4 pools carry no role positions until step 7 decides, and the
+  measurement counts the pairs the engine would rest orders in, not only
+  the pairs it swaps.
 - **Tooling on Robinhood Chain is ours.** Policy as code with the Roles SDK's
   condition utilities, applied through the Safe by script and read back from
   the modifier's events over RPC (no subgraph there); the app builds
@@ -130,7 +161,17 @@ session notes):
   trading Safe and an API wallet on Hyperliquid. By construction a full
   compromise of the app can only trade inside the allowlists; its residual,
   bad trades, is bounded by the token allowlist, the allowances and the
-  engine's own risk checks. Never a seed in the app.
+  engine's own risk checks. A range order makes that residual cleaner, not
+  larger: Roles conditions compare calldata and cannot see the pool price,
+  so a mint at an off-market tick is a gift that an arbitrageur, or an
+  accomplice, takes in the same bundle, as a swap with no minimum output
+  through a thin pool already is. The answers are the same (allowances,
+  the engine's check against an independent price), with one caveat: an
+  allowance on mint amounts counts the same capital every time a reload
+  cycle re-mints it, so it is sized for churn or left to the engine. If
+  the guarded contract of step 7 (b) is built, a range-order variant that
+  checks the range against `slot0` closes this residual on-chain. Never a
+  seed in the app.
 
 ### Boundaries and rules
 
@@ -158,8 +199,12 @@ session notes):
    multi-sig-wrapped action; trading through that agent from the app and from
    the web UI; a withdrawal refusing one signature.
 2. A fork of Robinhood Chain: the SwapRouter02 permission (recipient pinned,
-   token list, approvals), the bridge permission, the Hyperliquid deposit
-   transfer under its allowance, and the must-fail list.
+   token list, approvals), the position-manager permission (a single-sided
+   mint to the Safe, a partial fill decreased and collected to the Safe, a
+   reload cycle as one MultiSend), the bridge permission, the Hyperliquid
+   deposit transfer under its allowance, and the must-fail list, the
+   position NFT's transfers and approvals and a `collect` to another
+   recipient among it.
 3. Safe deployment at the same address on Robinhood Chain; a role call
    through Rabby with the Ledger; the Delay cooldown and its cancel.
 
@@ -188,7 +233,11 @@ session notes):
   until measured. Custom policy is the real risk and is answered by the fork
   suite.
 - Costs accepted: the Hyperliquid withdrawal needs both keys; v4-only pools
-  on Robinhood Chain are outside the role for now; the Zodiac tooling gap on
+  on Robinhood Chain are outside the role for now, for swaps and for range
+  orders alike; the position manager is one more target per chain in the
+  policy and the fork suite, and the engine's reload cycles are signed
+  role calls, so the KMS key's gas balance and the signer's audit volume
+  scale with how actively it trades; the Zodiac tooling gap on
   Robinhood Chain is ours to fill; the design is three systems (Safe, Roles,
   Hyperliquid multi-sig) with three failure modes to rehearse.
 - Products that do parts of this for teams exist (karpatkey's Roles
@@ -215,7 +264,12 @@ swaps is established there. What exists:
   policies over program ids, token mints and amounts; its own write-up
   shows a swap-only Jupiter policy and notes that Jupiter's dynamic routing
   defeats rigid instruction patterns. Enforcement is off-chain, at signing
-  time.
+  time. Range orders are the easier case there: Orca Whirlpools, Raydium
+  CLMM and Meteora DLMM (whose single-sided bins are the native limit-order
+  idiom) have static instruction and account layouts, and the rule is the
+  EVM one (the position owner and every destination token account pinned
+  to the trading wallet; transfers of the position mint denied), whichever
+  option below is taken.
 - **Cloud KMS signs Ed25519**, so the app's Solana key can be hardware-held
   like the EVM one.
 
