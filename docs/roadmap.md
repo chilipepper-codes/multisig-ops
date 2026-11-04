@@ -6,13 +6,15 @@ built yet (2026-10-24).
 
 ## Decided (ADR-001)
 
-EVM: one Safe per chain (amended 2026-11-04: the vault Safe is dropped,
-all on-chain capital trades), Roles on it and Delay under construction (b),
-one trader role for the home Ledger and the app's KMS key, scoped to swaps
-and CLMM range-order opens through **the guard** (decided 2026-11-04: a
-stateless, unowned contract that checks the pool's time-weighted price and
-depth and delivers everything to the Safe), range-order closes, bridges
-and the Hyperliquid deposit; the CoW presets out; Hyperliquid: native
+EVM: one funded Safe per chain (amended 2026-11-04: the vault Safe is
+dropped, all on-chain capital trades; under construction (b) a fundless
+second Safe queues through the Delay), Roles on it, one trader role for
+the home Ledger and the app's KMS key, scoped to swaps and CLMM
+range-order opens through **the guard** (decided 2026-11-04: a stateless,
+unowned contract that checks the pool's time-weighted price and depth and
+delivers everything to the Safe; v3-shaped pools only until it has a
+reference price on v4), range-order closes, bridges and the Hyperliquid
+deposit; the CoW presets out; Hyperliquid: native
 multi-sig with API wallets; the app's key in Cloud KMS; fork tests before
 any policy goes live; agents never hold a key, never touch mainnet.
 
@@ -46,11 +48,17 @@ any policy goes live; agents never hold a key, never touch mainnet.
    real funds pass through it.
 7. **Go live in stages**: the Safe with threshold 1 for a week, then the
    vault key and threshold 2; Hyperliquid last, since conversion is
-   one-way. (The former step 7, a measurement of the v4-only share to
-   decide how the role reaches v4, is retired: the guard reaches v4 by
-   construction, listed pool by pool.)
+   one-way.
 
 ## Queued, no decision made
+
+### v4 pools through the guard
+The guard's price and depth checks rest on v3's `observe`; a v4 pool has
+no oracle of its own, so v4 pools are outside the role (ADR-001). The open
+question is the guard's reference price there: a v3 pool of the same pair
+with enough depth, or a hook oracle listed pool by pool. Decided when the
+engine's v3-versus-v4 measurement (portfolio-tools ADR-014, paper mode)
+shows that v4-only pairs matter.
 
 ### Solana expansion
 Same requirements, different toolbox (ADR-001, last section). **Ruled out

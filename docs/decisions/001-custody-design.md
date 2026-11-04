@@ -2,7 +2,7 @@
 
 **Status:** accepted as the design (owner, 2026-10-24); amended 2026-11-02 to
 scope CLMM range orders into the trader role; amended 2026-11-04 (owner):
-one Safe per chain, the guard contract decided in front of every swap and
+one funded Safe per chain, the guard contract decided in front of every swap and
 range-order open, the CoW presets out of the role; nothing built yet. Solana is
 **proposed**, not decided (last section). Every "verify" line below is a
 testnet or fork step that precedes real funds.
@@ -56,10 +56,13 @@ session notes):
 
 ### EVM chains (Ethereum, Arbitrum, Base, Robinhood Chain)
 
-- **One Safe per chain, at the same address on every chain** (amended
+- **One funded Safe per chain, at the same address on every chain** (amended
   2026-11-04: the earlier vault Safe is dropped; all on-chain capital is
   trading capital, so there was nothing for it to hold apart, and its
-  isolation from module bugs protected an empty account). Threshold 2 of 3
+  isolation from module bugs protected an empty account. Under construction
+  (b) below a second Safe still exists per chain as the Delay's queuing
+  module, but it holds nothing, so the isolation argument does not come
+  back with it: one Safe holds funds either way). Threshold 2 of 3
   owners: the home Ledger, the vault key (the one in the bank vault) and a
   third key kept **off-site** (never a second home device: home alone must
   not reach the threshold). The Zodiac **Roles** modifier is enabled on it,
@@ -72,8 +75,12 @@ session notes):
 - **One role, "trader", two members:** the home Ledger's EOA and the app's
   KMS key. What the role allows, and nothing else: ERC-20 approvals on
   listed tokens, the spender pinned to the guard, a listed bridge or
-  Permit2, for the exact amount and in the same batch as the call that
-  spends it, so no standing approval sits on the Safe; swaps and
+  Permit2, the amount drawn from the token's per-period allowance (the
+  policy's bound: Roles checks each call on its own and cannot tie an
+  approval to the call that spends it, so "exact, and in the same batch"
+  is the engine's convention, not a guarantee; a leftover approval to the
+  guard is spendable only through the guard's own checks, since the guard
+  pulls from its caller); swaps and
   range-order opens through the guard, which delivers everything to the
   Safe (next bullets); closing a range position on the position manager
   with the proceeds pinned to the Safe; bridges whose destination is the
@@ -90,7 +97,8 @@ session notes):
   caller's parameters:
   - **The reference price** is the pool's time-weighted price (`observe`),
     never `slot0`, which is what the attacker moves.
-  - **A swap** pulls the input from the Safe, computes the minimum output
+  - **A swap** pulls the input from its caller, the Safe, computes the
+    minimum output
     from the reference price less a maximum deviation, calls the listed
     router, delivers the whole output to the Safe, and reverts otherwise.
   - **A range open** mints a single-sided position whose range lies on the
@@ -116,10 +124,16 @@ session notes):
     immutables, no admin, no upgrade, nothing to govern or compromise. The
     token allowlist and the allowances stay in Roles, as conditions on the
     guard's parameters.
-  - **It reaches v4** where the engine wants it: the guard can call the
-    Universal Router or the v4 PositionManager internally with recipients
-    pinned, so the role never needs conditions on command bytes. Hooked v4
-    pools are listed one by one, since a hook changes the swap math.
+  - **v3-shaped pools only, for now.** The reference price is v3's built-in
+    `observe`. A v4 pool has no oracle of its own, only what a hook
+    provides, and a hook also changes the swap math, so the guard's price
+    and depth checks are not defined there and v4 pools stay outside the
+    role. Reaching v4 through the guard (which would spare the role any
+    conditions on command bytes) is a queued decision whose open question
+    is the reference price: a v3 pool of the same pair with enough depth,
+    or a hook oracle listed pool by pool. It is taken when the engine's
+    v3-versus-v4 measurement (portfolio-tools ADR-014, paper mode) shows
+    that v4-only pairs matter.
   - **Cost:** custom Solidity in the trust path, roughly two hundred lines,
     so an audit before real funds, and the fork suite testing its reverts
     as it tests the policy's. The time-weighted price is itself movable on
@@ -169,17 +183,18 @@ session notes):
     the expiration to clear; rehearse both on a fork before choosing it.
   Role calls bypass the delay in both constructions by design.
 - **Swaps go through the guard, on every chain, v3 routers first.** On
-  Robinhood Chain the guard calls Uniswap v3's SwapRouter02; v4 pools are
-  reached through the guard when the engine wants them, hooked pools listed
-  one by one. Amended 2026-11-04: the CoW presets are out of the role. The
+  Robinhood Chain the guard calls Uniswap v3's SwapRouter02; v4 pools stay
+  outside the role until the queued decision above gives the guard a
+  reference price there. Amended 2026-11-04: the CoW presets are out of the role. The
   engine does not use CoW (a solver fills a resting order on its own terms,
   a range order fills from the pool's flow and earns the fee), the presets
   were one more code path on the Safe to fork-test, and the ERC-1271 path
   they rely on is where the June bug lived. They can come back as a policy
   change if the owner wants CoW for manual swaps through Pilot. Before this
-  amendment the design deferred v4 to a measurement and kept custom
-  Solidity out; the guard replaces both, justified by the residual it
-  closes (the app's key, below) rather than by v4.
+  amendment the design kept custom Solidity out until a measurement said
+  v4 mattered; the guard is now justified by the residual it closes (the
+  app's key, below), and the measurement stays as the trigger for the v4
+  decision.
 - **Tooling on Robinhood Chain is ours.** Policy as code with the Roles SDK's
   condition utilities, applied through the Safe by script and read back from
   the modifier's events over RPC (no subgraph there); the app builds
@@ -238,8 +253,8 @@ session notes):
   execution. Nothing in this repository places a real order.
 - **The fork test suite comes before any policy goes live**: every allowed
   call passes, a list of must-fail calls (a transfer out, an approval to
-  another spender, a router or a `mint` called outside the guard, an
-  unlisted token) reverts, and the guard's own reverts hold (a swap past
+  another spender or above the allowance, a router or a `mint` called
+  outside the guard, an unlisted token) reverts, and the guard's own reverts hold (a swap past
   the band, an open against a moved spot, a pool under the depth floor),
   on every chain, on every policy change and on a schedule. Policy is code that fails
   silently; this is what makes it safe to change.
@@ -261,8 +276,8 @@ session notes):
    reload cycle as one MultiSend), the bridge permission, the Hyperliquid
    deposit transfer under its allowance, and the must-fail list, with a
    direct router call, a direct `mint`, the position NFT's transfers and
-   approvals, an approval to another spender and a `collect` to another
-   recipient among it.
+   approvals, an approval to another spender or above the allowance, and a
+   `collect` to another recipient among it.
 3. Safe deployment at the same address on Robinhood Chain; a role call
    through Rabby with the Ledger; the Delay cooldown and its cancel.
 4. The guard's audit, its findings closed in the fork suite, before any real
@@ -293,7 +308,8 @@ session notes):
   never moves funds, since it holds nothing and sends only to the Safe.
   Custom policy is the other risk, and the same suite answers it.
 - Costs accepted: the Hyperliquid withdrawal needs both keys; the guard is
-  a contract to audit and a dependency of every trade; the engine's reload
+  a contract to audit and a dependency of every trade; v4-only pools are
+  outside the role until the guard has a reference price there; the engine's reload
   cycles are signed role calls, so the KMS key's gas balance and the
   signer's audit volume scale with how actively it trades; the Zodiac
   tooling gap on Robinhood Chain is ours to fill; the design is three

@@ -25,7 +25,8 @@ order and what is queued without a decision (Solana).
 - `docs/decisions/` — ADRs (this is the canon; design rationale lives here).
 - `policies/` — the Roles policies per chain, as code.
 - `contracts/` — the guard (ADR-001): the one contract in front of every
-  swap and range-order open, stateless and unowned, with its fork tests.
+  swap and range-order open, stateless and unowned; its fork tests sit
+  under `test/` with the policies'.
 - `scripts/` — Safe deployment at the same address per chain, policy apply
   and verify (reads the modifier's own events; no subgraph needed), the
   Hyperliquid multi-sig actions.
