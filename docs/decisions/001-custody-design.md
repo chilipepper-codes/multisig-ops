@@ -85,9 +85,11 @@ session notes):
   Safe (next bullets); closing a range position on the position manager
   with the proceeds pinned to the Safe; bridges whose destination is the
   Safe's address on the other chain; a token allowlist; per-period
-  allowances; one transfer target outside the Safe, the Hyperliquid deposit
-  account below, under an allowance. An approval to any other spender, and
-  a transfer to any other address, is not a role call: it needs two owners.
+  allowances; buys of unlisted tokens through the guard under the degen
+  allowance (the guard bullet); one transfer target outside the Safe, the
+  Hyperliquid deposit account below, under an allowance. An approval to
+  any other spender, and a transfer to any other address, is not a role
+  call: it needs two owners.
 - **The guard (decided 2026-11-04): one contract in front of every swap and
   every range-order open.** Roles conditions compare calldata and cannot
   see a price, so a compromised engine could trade through a thin or
@@ -105,21 +107,25 @@ session notes):
     correct side of the reference price and within a few tick spacings of
     it, with the minimum equal to the amount offered (a range the price has
     already entered reverts), the NFT to the Safe.
-  - **A depth floor, relative to the trade.** The floor is what makes the
-    reference price worth trusting: moving a time-weighted price by the
-    band must cost more than it gains. On a pool nobody arbitrages, pushing
-    the price and pulling it back costs only the fees of the round trip, so
-    the cost is the depth within the band times the fees, and the gain is
-    the trade size times the band. Both are in the same token, so the floor
-    needs no valuation of either token and holds for any pair, a shitcoin
-    against a tokenized stock included: the depth within the band, on the
-    side the trade consumes, must be at least N times the trade size, N
-    set per fee tier (about one over twice the fee: around 50 on a 1%
-    pool, more on cheaper tiers), or the call reverts. The per-period
-    allowance in the same token makes it hold for the period, not only for
-    one trade. Depth can be flash-added to pass the floor, which is
-    harmless at a fair price and caught by the price check otherwise; the
-    two checks hold together, neither alone.
+  - **A depth floor relative to the trade, per pool, for listed pools.**
+    The floor is what makes the reference price worth trusting: moving a
+    time-weighted price by the band must cost more than it gains. On a pool
+    nobody arbitrages, pushing the price and pulling it back costs only the
+    fees of the round trip, so the cost is the depth within the band times
+    the fees, and the gain is the trade size times the band. Both are in
+    the same token, so the floor needs no valuation of either token and
+    holds for any pair, a shitcoin against a tokenized stock included: the
+    depth within the band, on the side the trade consumes, must be at
+    least N times the trade size, or the call reverts. N is a policy
+    parameter per pool, not a rule of the guard: for listed pools it
+    defaults to the fee tier's multiple (about one over twice the fee:
+    around 50 on a 1% pool, more on cheaper tiers), which deep pools clear
+    without noticing; it is set to zero where the owner wants size in a
+    thin pool (the degen allowance below), since a conservative multiple
+    would stop the owner aping a fresh launch, which is sometimes the
+    trade. Depth can be flash-added to pass the floor, which is harmless
+    at a fair price and caught by the price check otherwise; the two
+    checks hold together, neither alone.
   - **An absolute floor through a pricing path**, as a sanity bound on top.
     "Never trade a pool with less than this in it" needs a unit, and a
     quote asset can be anything (the current fashion pairs coins with
@@ -136,10 +142,33 @@ session notes):
     halt a pool that clears its own floor. The engine, off-chain, is free
     to use any feed, exchange price or the stock's real quote in its own
     checks, with no on-chain dependency.
+  - **The degen allowance (owner, 2026-11-04): buys of unlisted tokens,
+    capped.** A just-launched coin is not on the token allowlist, and
+    listing one is a two-key change, so without this the Safe could never
+    ape a launch. The role may buy a token that is not on the allowlist,
+    through the guard, under a per-period allowance stated in stablecoin
+    terms through the pricing path, provided the pool is quoted in a
+    stablecoin or WETH and clears the absolute floor. This is the one
+    priced exit in the design, and it is shaped by the wrench attack: a
+    coerced buy of the attacker's coin in the attacker's pool is how the
+    role path would be made to pay out, so the absolute floor makes the
+    attacker show up with a pool holding real money (a capital barrier,
+    not a loss to them, since they take their liquidity back), and the
+    allowance is what a coercion yields per period, the number the owner
+    is prepared to lose with a wrench at their head. The time-weighted
+    price is no defence here, the attacker set it, and neither is the
+    Delay, which role calls bypass. Selling any token the Safe holds back
+    into a listed token is never capped, subject to the guard: de-risking
+    is not an exit. A young v3 pool has an oracle cardinality of one, so
+    `observe` over the window reverts until it is grown and filled; the
+    guard lets such a pool through on the absolute floor and the degen
+    allowance alone, without the price check, and that is the degen path
+    by construction. Launches on v2 pairs and on v4 are outside the guard
+    and so outside the role.
   - **The parameters are the policy's.** The deviation, the tick distance,
-    the depth multiple, the absolute floor and the pricing path are call
-    parameters that Roles pins per pool to a maximum, a minimum or a
-    value, so changing them is a two-key policy change. The
+    the depth multiple, the absolute floor, the pricing path and the degen
+    allowance are call parameters that Roles pins per pool to a maximum, a
+    minimum or a value, so changing them is a two-key policy change. The
     guard is **stateless and unowned**: routers and position managers as
     immutables, no admin, no upgrade, nothing to govern or compromise. The
     token allowlist and the allowances stay in Roles, as conditions on the
@@ -276,7 +305,9 @@ session notes):
   another spender or above the allowance, a router or a `mint` called
   outside the guard, an unlisted token) reverts, and the guard's own reverts hold (a swap past
   the band, an open against a moved spot, a trade larger than the pool's
-  depth allows, a pricing hop under its floor),
+  depth allows, a pricing hop under its floor, a buy of an unlisted token
+  above the degen allowance or in a pool under the absolute floor or
+  quoted in another unlisted token),
   on every chain, on every policy change and on a schedule. Policy is code that fails
   silently; this is what makes it safe to change.
 - Build on Roles 2.1.1 and Delay 1.1.1 with the current unwrapper; migrate to
@@ -293,7 +324,10 @@ session notes):
    delivers to the Safe; a swap after a flash move of the spot reverts; a
    single-sided open to the Safe; an open against a moved spot reverts; a
    trade larger than the pool's depth allows reverts; a quote priced
-   through a hop under its floor reverts), the close permission on the
+   through a hop under its floor reverts; a buy of an unlisted token
+   passes under the degen allowance in a young pool over the floor, and
+   reverts above the allowance, under the floor, or quoted in another
+   unlisted token), the close permission on the
    position manager (a partial fill decreased and collected to the Safe, a
    reload cycle as one MultiSend), the bridge permission, the Hyperliquid
    deposit transfer under its allowance, and the must-fail list, with a
@@ -323,8 +357,10 @@ session notes):
   visits.
 - Under a wrench attack the home key alone can trade within the allowlists
   and move money between the owner's own addresses, including the
-  Hyperliquid deposit account up to its allowance. It cannot send anything
-  elsewhere.
+  Hyperliquid deposit account up to its allowance. The one priced exit is
+  the degen allowance: a coerced buy of the attacker's token in a pool the
+  attacker has funded past the absolute floor, capped per period. It
+  cannot send anything elsewhere.
 - Custom Solidity is the guard and nothing else: stateless, unowned,
   audited, its reverts in the fork suite. A bug in it stops trading and
   never moves funds, since it holds nothing and sends only to the Safe.

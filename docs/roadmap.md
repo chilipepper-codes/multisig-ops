@@ -14,7 +14,8 @@ range-order opens through **the guard** (decided 2026-11-04: a stateless,
 unowned contract that checks the pool's time-weighted price and depth and
 delivers everything to the Safe; v3-shaped pools only until it has a
 reference price on v4), range-order closes, bridges and the Hyperliquid
-deposit; the CoW presets out; Hyperliquid: native
+deposit, and buys of unlisted tokens under a per-period degen allowance
+(the one priced exit, shaped by the wrench attack); the CoW presets out; Hyperliquid: native
 multi-sig with API wallets; the app's key in Cloud KMS; fork tests before
 any policy goes live; agents never hold a key, never touch mainnet.
 
