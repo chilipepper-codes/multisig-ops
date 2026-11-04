@@ -118,9 +118,9 @@ session notes):
     depth within the band, on the side the trade consumes, must be at
     least N times the trade size, or the call reverts. N is a policy
     parameter per pool, not a rule of the guard: for listed pools it
-    defaults to the fee tier's multiple (about one over twice the fee:
-    around 50 on a 1% pool, more on cheaper tiers), which deep pools clear
-    without noticing; it is set to zero where the owner wants size in a
+    defaults to the band over twice the fee (about one half on a 1% pool
+    with a 1% band, about ten on a 0.05% pool), which is mild at realistic
+    settings and deep pools clear without noticing; it is set to zero where the owner wants size in a
     thin pool (the degen allowance below), since a conservative multiple
     would stop the owner aping a fresh launch, which is sometimes the
     trade. Depth can be flash-added to pass the floor, which is harmless
