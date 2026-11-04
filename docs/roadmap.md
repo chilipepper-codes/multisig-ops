@@ -6,27 +6,30 @@ built yet (2026-10-24).
 
 ## Decided (ADR-001)
 
-EVM: two Safes per chain, Roles + Delay on the trading one, one trader role
-for the home Ledger and the app's KMS key, scoped to swaps, bridges, the
-Hyperliquid deposit and (amended 2026-11-02) CLMM range orders, the
-execution engine's resting limit orders as single-sided positions owned by
-the Safe; Hyperliquid: native multi-sig with API wallets; the app's key in
-Cloud KMS; fork tests before any policy goes live; agents never hold a key,
-never touch mainnet.
+EVM: one Safe per chain (amended 2026-11-04: the vault Safe is dropped,
+all on-chain capital trades), Roles on it and Delay under construction (b),
+one trader role for the home Ledger and the app's KMS key, scoped to swaps
+and CLMM range-order opens through **the guard** (decided 2026-11-04: a
+stateless, unowned contract that checks the pool's time-weighted price and
+depth and delivers everything to the Safe), range-order closes, bridges
+and the Hyperliquid deposit; the CoW presets out; Hyperliquid: native
+multi-sig with API wallets; the app's key in Cloud KMS; fork tests before
+any policy goes live; agents never hold a key, never touch mainnet.
 
 ## Build order (EVM + Hyperliquid)
 
 1. **The fork test harness**: a Safe + Roles + Delay deployment on a fork of
    each chain, a policy applied, the allowed list passing and the must-fail
    list reverting. The acceptance test everything else is measured against.
-2. **Policy as code** for Base, Arbitrum, Ethereum (CoW presets, for the
-   owner's own swaps through Pilot) and Robinhood Chain (SwapRouter02 with
-   the recipient pinned, the native bridge, the Hyperliquid deposit transfer
-   under its allowance), plus, on every chain, the **position manager**
-   target for the engine's CLMM range orders (ADR-001: mint and collect
-   pinned to the Safe, the NFT's transfers and approvals, `multicall` and
-   the sweeps on the must-fail list; v3-shaped managers only, v4 waits on
-   step 7); the apply and verify scripts that read the modifier's events
+2. **The guard and the policy as code.** The guard contract (swap and
+   range-order open; time-weighted reference price, deviation band, tick
+   distance, depth floor per pool; stateless, unowned) with its fork tests,
+   and the policies for Base, Arbitrum, Ethereum and Robinhood Chain:
+   approvals pinned to the guard, a bridge or Permit2 and exact, the
+   guard's parameters pinned per pool, the position manager's close
+   functions with the proceeds pinned to the Safe, the native bridge, the
+   Hyperliquid deposit transfer under its allowance, and the must-fail list
+   (ADR-001); the apply and verify scripts that read the modifier's events
    (no subgraph on Robinhood Chain).
 3. **Same-address Safes by script**, the Delay cooldown, a role call through
    Rabby with the Ledger — on testnets first.
@@ -39,14 +42,13 @@ never touch mainnet.
    one MultiSend role call); the executor's bad-trade residual bounded by
    the token list, the allowances (sized for the churn of reloads) and the
    engine's checks.
-6. **Go live in stages**: the trading Safe with threshold 1 for a week,
-   then the vault key and threshold 2; Hyperliquid last, since conversion is
-   one-way.
-7. **Measure the v4-only share** of the Robinhood Chain flow for a few
-   weeks, swaps and the pairs the engine would rest range orders in, then
-   decide between Universal Router conditions and the guarded swapper
-   (ADR-001); a guarded contract, if built, gets the range-order variant
-   that checks the range against the pool price.
+6. **The guard's audit**, its findings closed in the fork suite, before any
+   real funds pass through it.
+7. **Go live in stages**: the Safe with threshold 1 for a week, then the
+   vault key and threshold 2; Hyperliquid last, since conversion is
+   one-way. (The former step 7, a measurement of the v4-only share to
+   decide how the role reaches v4, is retired: the guard reaches v4 by
+   construction, listed pool by pool.)
 
 ## Queued, no decision made
 
@@ -78,8 +80,10 @@ decided and another solution possible when the work is taken up:
 - **UniswapX intents through the Safe** once Roles v3 ships its typed-message
   signing library, as a second swap path on Robinhood Chain that needs no
   router conditions.
-- **The guarded swapper** as a product-grade component (audited, any router,
-  any chain) if the measurement in step 7 says v4-only pools matter.
+- **Dollar-denominated depth floors** on the guard through an oracle
+  (Chainlink's ETH/USD if deployed on Robinhood Chain, else the chain's
+  deepest WETH/stable pool), if floors in quote units prove awkward to
+  keep.
 - **Monitoring**: an alert on every role execution and every Delay queue
   entry (Tenderly, OpenZeppelin Defender or our own watcher), so a coerced
   or compromised use is seen within minutes.
