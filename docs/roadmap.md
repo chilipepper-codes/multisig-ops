@@ -25,7 +25,9 @@ any policy goes live; agents never hold a key, never touch mainnet.
    list reverting. The acceptance test everything else is measured against.
 2. **The guard and the policy as code.** The guard contract (swap and
    range-order open; time-weighted reference price, deviation band, tick
-   distance, depth floor per pool; stateless, unowned) with its fork tests,
+   distance, a depth floor relative to the trade and an absolute one
+   through a pricing path over the chain's own pools; stateless, unowned)
+   with its fork tests,
    and the policies for Base, Arbitrum, Ethereum and Robinhood Chain:
    approvals pinned to the guard, a bridge or Permit2 and exact, the
    guard's parameters pinned per pool, the position manager's close
@@ -88,10 +90,9 @@ decided and another solution possible when the work is taken up:
 - **UniswapX intents through the Safe** once Roles v3 ships its typed-message
   signing library, as a second swap path on Robinhood Chain that needs no
   router conditions.
-- **Dollar-denominated depth floors** on the guard through an oracle
-  (Chainlink's ETH/USD if deployed on Robinhood Chain, else the chain's
-  deepest WETH/stable pool), if floors in quote units prove awkward to
-  keep.
+- **External feeds on the guard** (Chainlink, Pyth) as a sanity check on a
+  tokenized stock's pricing hop, where a feed is deployed on the chain;
+  never a dependency (ADR-001, the guard).
 - **Monitoring**: an alert on every role execution and every Delay queue
   entry (Tenderly, OpenZeppelin Defender or our own watcher), so a coerced
   or compromised use is seen within minutes.

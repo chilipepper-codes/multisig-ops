@@ -105,21 +105,41 @@ session notes):
     correct side of the reference price and within a few tick spacings of
     it, with the minimum equal to the amount offered (a range the price has
     already entered reverts), the NFT to the Safe.
-  - **A depth floor**, per pool, in quote-token units: the quote amount the
-    pool's active liquidity holds within a band of the reference price must
-    exceed it, or the call reverts. The floor is what makes the reference
-    price worth trusting: a thin pool's time-weighted price is cheap to
-    move, a deep one's is not. Depth can be flash-added to pass the floor,
-    which is harmless at a fair price and caught by the price check
-    otherwise; the two checks hold together, neither alone.
-    Stablecoin-quoted pools need no conversion; WETH-quoted pools state the
-    floor in ETH. An oracle (Chainlink's ETH/USD if it is deployed on
-    Robinhood Chain, else the chain's deepest WETH/stable pool) would let
-    floors be stated in dollars; it is an option, not a dependency, since a
-    stale feed would revert every trade.
-  - **The parameters are the policy's.** The deviation, the tick distance
-    and the depth floor are call parameters that Roles pins per pool to a
-    maximum or minimum, so changing them is a two-key policy change. The
+  - **A depth floor, relative to the trade.** The floor is what makes the
+    reference price worth trusting: moving a time-weighted price by the
+    band must cost more than it gains. On a pool nobody arbitrages, pushing
+    the price and pulling it back costs only the fees of the round trip, so
+    the cost is the depth within the band times the fees, and the gain is
+    the trade size times the band. Both are in the same token, so the floor
+    needs no valuation of either token and holds for any pair, a shitcoin
+    against a tokenized stock included: the depth within the band, on the
+    side the trade consumes, must be at least N times the trade size, N
+    set per fee tier (about one over twice the fee: around 50 on a 1%
+    pool, more on cheaper tiers), or the call reverts. The per-period
+    allowance in the same token makes it hold for the period, not only for
+    one trade. Depth can be flash-added to pass the floor, which is
+    harmless at a fair price and caught by the price check otherwise; the
+    two checks hold together, neither alone.
+  - **An absolute floor through a pricing path**, as a sanity bound on top.
+    "Never trade a pool with less than this in it" needs a unit, and a
+    quote asset can be anything (the current fashion pairs coins with
+    tokenized stocks). The guard values the quote through the chain's own
+    pools: at most two hops to a stablecoin or WETH (coin to stock token,
+    stock token to USDC), each hop a time-weighted price in a pool that
+    must clear its own relative floor. The path is a parameter pinned per
+    pool by the policy, like the band and the multiple, so the guard stays
+    stateless. For a tokenized stock its USDC pool on the chain is its
+    on-chain market and the natural source. External feeds (Chainlink,
+    Pyth) exist for ETH and may exist for tokenized stocks on Robinhood
+    Chain, never for a coin; on-chain they are at most a sanity check on a
+    stock token's hop, where one is deployed, and a stale feed must never
+    halt a pool that clears its own floor. The engine, off-chain, is free
+    to use any feed, exchange price or the stock's real quote in its own
+    checks, with no on-chain dependency.
+  - **The parameters are the policy's.** The deviation, the tick distance,
+    the depth multiple, the absolute floor and the pricing path are call
+    parameters that Roles pins per pool to a maximum, a minimum or a
+    value, so changing them is a two-key policy change. The
     guard is **stateless and unowned**: routers and position managers as
     immutables, no admin, no upgrade, nothing to govern or compromise. The
     token allowlist and the allowances stay in Roles, as conditions on the
@@ -255,7 +275,8 @@ session notes):
   call passes, a list of must-fail calls (a transfer out, an approval to
   another spender or above the allowance, a router or a `mint` called
   outside the guard, an unlisted token) reverts, and the guard's own reverts hold (a swap past
-  the band, an open against a moved spot, a pool under the depth floor),
+  the band, an open against a moved spot, a trade larger than the pool's
+  depth allows, a pricing hop under its floor),
   on every chain, on every policy change and on a schedule. Policy is code that fails
   silently; this is what makes it safe to change.
 - Build on Roles 2.1.1 and Delay 1.1.1 with the current unwrapper; migrate to
@@ -271,7 +292,8 @@ session notes):
 2. A fork of Robinhood Chain: the guard (a swap within the band passes and
    delivers to the Safe; a swap after a flash move of the spot reverts; a
    single-sided open to the Safe; an open against a moved spot reverts; a
-   pool under the depth floor reverts), the close permission on the
+   trade larger than the pool's depth allows reverts; a quote priced
+   through a hop under its floor reverts), the close permission on the
    position manager (a partial fill decreased and collected to the Safe, a
    reload cycle as one MultiSend), the bridge permission, the Hyperliquid
    deposit transfer under its allowance, and the must-fail list, with a
