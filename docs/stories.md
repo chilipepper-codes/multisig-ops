@@ -36,11 +36,13 @@ the signer service. Agents never hold any key and never touch mainnet.
 
 4. **When I want to sell a token I hold, I can always do so at once with
    the home key.** Through the guard, with the approver granting the
-   approval at sale time; no price or depth check on sales by default; the
-   sale goes through the pool the registry knows for the token. Residual
-   (accepted): a thief with the home key and the capital to move that
-   pool can sandwich the Safe's own sale; the sell band per pool is the
-   lever if a position warrants it.
+   approval at sale time; a wide band (30% by default) over a short window
+   against the pool's time-weighted price; the sale goes through the pool
+   the registry knows for the token, and a pool too young to have a
+   time-weighted price passes on that rule alone. Residual (accepted): a
+   crash faster than the window holds a sale back for at most the window;
+   a thief with the home key and the capital to move the pool can
+   sandwich the Safe's own sale for up to the band.
 5. **When I want to buy a token I already bought in the past, I can do it
    at once with the home key.** A listed token: the listed path. A token
    bought under the degen allowance and never listed: the degen path
@@ -100,13 +102,20 @@ the signer service. Agents never hold any key and never touch mainnet.
     Arbitrum address (the one transfer out the role allows, capped), and
     that address sends it to the bridge. The cap is the typical deposit
     size, because that address is an ordinary account whose key is kept
-    at home. Residual: one period's deposits, story 10.
+    at home. Residual: one period's deposits, story 10. **To verify
+    (build step 4):** the Safe itself as the Hyperliquid account, through
+    a same-address Safe on HyperEVM acting on HyperCore via CoreWriter,
+    which would make the deposit a plain role call into the bridge with no
+    hop and no allowance (ADR-001, Hyperliquid).
 14. **Trading on Hyperliquid needs no owner key; withdrawing from it needs
     two.** API wallets (the owner's browser agent, the app key) trade and
     cannot withdraw by Hyperliquid's own rules; the account is a native
-    multi-sig with the home and vault keys at threshold 2. Residual: a
+    multi-sig with the home and vault keys at threshold 2, so the
+    withdrawal is Hyperliquid's multi-sig's, not the Safe's. Residual: a
     Hyperliquid withdrawal can go to any destination, so the balance there
-    is kept at trading size.
+    is kept at trading size. If the Safe becomes the account (story 13's
+    verification), the withdrawal becomes story 2's path instead and the
+    residual goes away.
 
 ## Operations
 

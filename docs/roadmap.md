@@ -23,9 +23,9 @@ per-pool parameters and the per-period notionals in a **registry** the
 guard reads, where the home key alone can add a token behind a **listing
 Delay** owned by the vault key with a three-day cooldown (amended
 2026-11-05; the listing attack accepted), an **approver** module that
-grants the guard its token approvals, no price or depth checks on sales
-by default, and a **pause flag** any role member can set; the CoW presets
-out; Hyperliquid: native
+grants the guard its token approvals, a wide (30%) band over a short
+window on sales, and a **pause flag** any role member can set; the CoW
+presets out; Hyperliquid: native
 multi-sig with API wallets; the app's key in Cloud KMS; fork tests before
 any policy goes live; agents never hold a key, never touch mainnet.
 
@@ -53,10 +53,15 @@ any policy goes live; agents never hold a key, never touch mainnet.
    by the funded Safe; the listing Delay's, owned by the vault key), a
    role call and a queued listing through Rabby with the Ledger — on
    testnets first.
-4. **Hyperliquid on testnet**: the multi-sig conversion, agent approval
+4. **Hyperliquid on testnet**: first, whether the Safe itself can be the
+   account (ADR-001: a same-address Safe on HyperEVM acting on HyperCore
+   through CoreWriter; Zodiac's deployment there; the deposit credited to
+   the Safe; API wallets approved through CoreWriter; funds moved back to
+   the HyperEVM Safe), which would retire the hop, its allowance and the
+   native multi-sig; otherwise the multi-sig conversion, agent approval
    through the multi-sig, trading through the agent, a withdrawal refusing
-   one signature. The multisig UI: Hyperliquid's own, or the open-source
-   signer.
+   one signature, and the multisig UI (Hyperliquid's own, or the
+   open-source signer).
 5. **The KMS signer service** and the tracker's intent API, whose intents
    include opening, reloading and closing a range order (a reload cycle is
    one MultiSend role call); the executor's bad-trade residual bounded by

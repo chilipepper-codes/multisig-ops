@@ -7,9 +7,10 @@ range-order open, the CoW presets out of the role; amended 2026-11-05 (owner):
 the token registry behind a listing Delay the home key alone can queue on,
 and the approver module; amended again 2026-11-05 after the owner's user
 stories (`docs/stories.md`, the spec this design is measured against):
-three owner keys, 3 of 3 direct and 2 of 3 through the Delay, no checks
-on sales by default, the listing attack accepted at a three-day cooldown,
-a pause flag; nothing built yet. Solana is
+three owner keys, 3 of 3 direct and 2 of 3 through the Delay, a wide
+band on sales, the listing attack accepted at a three-day cooldown, a
+pause flag, the Safe as the Hyperliquid account to verify; nothing built
+yet. Solana is
 **proposed**, not decided (last section). Every "verify" line below is a
 testnet or fork step that precedes real funds.
 
@@ -107,18 +108,23 @@ session notes):
   caller's parameters:
   - **The reference price** is the pool's time-weighted price (`observe`),
     never `slot0`, which is what the attacker moves. The checks below
-    apply to **buys**. **Sales carry no price or depth check by default**
-    (owner, 2026-11-05): a rug must be exitable at once with the home key,
-    and a lagging time-weighted price would lock the owner in; with the
+    apply to buys and to sales alike, with different parameters. **Sales
+    get a wide band, 30% by default, over a short window** (owner,
+    2026-11-05): a rug must be exitable at once with the home key, and a
+    narrow band against a lagging time-weighted price would lock the owner
+    in, while no band at all would let a thief with the home key sandwich
+    the Safe's own sales in their real pool for the whole position. The
+    wide band bounds that loss per sale at the band; the short window
+    (minutes, a per-pool parameter) bounds how long a crash faster than
+    the window can hold a sale back, at most the window itself. With the
     allowlist and the degen allowance in place the checks need not be
-    stringent anywhere, and the buy-side defaults are loose, tightened per
-    pool by the owner. Two things hold on every sale regardless: the guard
-    sells only through a pool the registry knows for the token (the listed
-    pool, or the pool a degen token was first bought in), never one the
-    caller names, so a thief cannot route a sale to a pool of their own;
-    and the sell band stays a per-pool parameter, off unless set, for a
-    position where a sandwich by a thief outweighs the rug risk. The
-    residual is in the Consequences.
+    stringent anywhere, so the buy-side defaults are loose too, tightened
+    per pool by the owner. On every sale the guard sells only through a
+    pool the registry knows for the token (the listed pool, or the pool a
+    degen token was first bought in), never one the caller names, so a
+    thief cannot route a sale to a pool of their own; a pool with no
+    time-weighted price yet (a young one) passes a sale on that rule
+    alone.
   - **A swap** pulls the input from its caller, the Safe, computes the
     minimum output
     from the reference price less a maximum deviation, calls the listed
@@ -359,12 +365,40 @@ session notes):
   key can send whatever reaches it anywhere; the per-period allowance on
   the transfer is sized to the typical deposit, nothing more, so a stolen
   home key takes at most one period's deposits by this route.
-- **Withdrawing from Hyperliquid is a two-key action.** This is the one
-  requirement the design does not meet: whoever can withdraw on Hyperliquid
-  can choose any destination, and the multi-sig threshold is the only lever.
-  Accepted: the Hyperliquid balance is kept at trading size, and withdrawals
-  are planned. The alternative, the account on the home key, leaves the whole
-  balance wrench-exposed.
+- **Withdrawing from Hyperliquid is a two-key action**, handled by
+  Hyperliquid's own multi-sig, not the Safe. This is the one requirement
+  the design does not meet: whoever can withdraw on Hyperliquid can choose
+  any destination, and the multi-sig threshold is the only lever.
+  Accepted: the Hyperliquid balance is kept at trading size, and
+  withdrawals are planned. The alternative, the account on the home key,
+  leaves the whole balance wrench-exposed.
+- **To verify in build step 4 (2026-11-05): the Safe itself as the
+  Hyperliquid account.** The owner asked whether a bridge aggregator could
+  deposit without the hop. An aggregator cannot change Hyperliquid's rule
+  that a deposit is credited to the address that sent it, so by itself it
+  does not; but the rule cuts the other way too: USDC the Arbitrum Safe
+  sends to the bridge contract is credited to the Safe's own address on
+  HyperCore. What made that address useless was that a Safe cannot sign
+  Hyperliquid's messages. Since 2025 HyperEVM has the CoreWriter system
+  contract, through which a contract at an address acts for that address
+  on HyperCore (orders, spot sends, transfers between spot and perp, vault
+  transfers; the full action list, and whether approving an API wallet is
+  among them, is to be read from Hyperliquid's own docs), and Safe is live
+  on HyperEVM. So a Safe at the same address on HyperEVM, with Roles and
+  the Delay if the Zodiac mastercopies are deployed there (unconfirmed),
+  would own the HyperCore account: the Arbitrum Safe deposits straight
+  into the bridge as a role call, with no hop, no home-kept key and no
+  allowance; the API wallets are approved once through CoreWriter; moving
+  funds from HyperCore to the HyperEVM Safe is a transfer between the
+  owner's own addresses, and bridging out of that Safe is a withdrawal
+  like any other, two keys through the Delay with the destination pinned.
+  That would retire the native multi-sig, the deposit hop and its
+  allowance, and the one unmet requirement above. Caveats to settle on
+  testnet: CoreWriter actions are fire-and-forget (the EVM transaction
+  succeeds whether or not HyperCore accepts the action, so the engine
+  confirms by reading HyperCore state); the exact deposit and withdrawal
+  mechanics between HyperEVM and HyperCore; the Zodiac deployment. Until
+  verified, the native multi-sig design above stands.
 
 ### The app's key
 
@@ -478,11 +512,11 @@ session notes):
   (2026-11-05): after the three-day listing cooldown, the listed path's
   per-period notional into a pool of the thief's own, unless the vault key
   skips the listing first; the Hyperliquid deposit allowance, if that
-  account's key is kept with the home key; and, since sales carry no
-  price check by default, a sandwich of the Safe's own sales in their
-  real pool by a thief who also has the capital to move that pool (which
-  they get back), bounded only by the pool's depth and the sell band
-  where the owner has set one. The pause flag ends all of it the moment
+  account's key is kept with the home key; and a sandwich of the Safe's
+  own sales in their real pool by a thief who also has the capital to
+  move that pool (which they get back), bounded per sale by the 30% sell
+  band and by what moving a deep pool's time-weighted price costs. The
+  pause flag ends all of it the moment
   the owner notices, with the home key; the monitoring step is what makes
   noticing likely.
 - Custom Solidity is the guard, the registry and the approver: holding no
