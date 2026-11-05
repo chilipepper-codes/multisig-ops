@@ -5,7 +5,10 @@ on EVM chains, the Hyperliquid native multi-sig tooling, the hardware-held key
 the portfolio tracker's execution engine trades with, and the fork test suite
 that proves what each policy allows and refuses.
 
-**Start here:** [`docs/decisions/001-custody-design.md`](docs/decisions/001-custody-design.md)
+**Start here:** [`docs/stories.md`](docs/stories.md) — the user stories
+the custody layer must satisfy, each with the mechanism that satisfies it
+and the residual the owner accepted — then
+[`docs/decisions/001-custody-design.md`](docs/decisions/001-custody-design.md)
 — the design, what it meets, what it does not, and what is verified before any
 real funds move — then [`docs/roadmap.md`](docs/roadmap.md) for the build
 order and what is queued without a decision (Solana).
@@ -22,6 +25,8 @@ order and what is queued without a decision (Solana).
 
 ## Layout (planned)
 
+- `docs/stories.md` — the user stories: the spec the policies and the fork
+  suite are measured against.
 - `docs/decisions/` — ADRs (this is the canon; design rationale lives here).
 - `policies/` — the Roles policies per chain, as code.
 - `contracts/` — the guard (ADR-001), the one contract in front of every

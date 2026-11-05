@@ -5,7 +5,11 @@ scope CLMM range orders into the trader role; amended 2026-11-04 (owner):
 one funded Safe per chain, the guard contract decided in front of every swap and
 range-order open, the CoW presets out of the role; amended 2026-11-05 (owner):
 the token registry behind a listing Delay the home key alone can queue on,
-and the approver module; nothing built yet. Solana is
+and the approver module; amended again 2026-11-05 after the owner's user
+stories (`docs/stories.md`, the spec this design is measured against):
+three owner keys, 3 of 3 direct and 2 of 3 through the Delay, no checks
+on sales by default, the listing attack accepted at a three-day cooldown,
+a pause flag; nothing built yet. Solana is
 **proposed**, not decided (last section). Every "verify" line below is a
 testnet or fork step that precedes real funds.
 
@@ -64,11 +68,14 @@ session notes):
   isolation from module bugs protected an empty account. Under construction
   (b) below a second Safe still exists per chain as the Delay's queuing
   module, but it holds nothing, so the isolation argument does not come
-  back with it: one Safe holds funds either way). Threshold 2 of 3
-  owners: the home Ledger, the vault key (the one in the bank vault) and a
-  third key kept **off-site** (never a second home device: home alone must
-  not reach the threshold). The Zodiac **Roles** modifier is enabled on it,
-  and the **Delay** modifier under construction (b) below. The whole book
+  back with it: one Safe holds funds either way). Three owners, all the
+  owner's: the home Ledger, the vault key (the one in the bank vault) and
+  a third key kept **off-site** (never a second home device: home alone
+  must not reach any threshold). **Threshold 3 of 3** on this Safe: the
+  direct path is the break-glass, with no module between the three keys
+  and the funds (decided 2026-11-05, the owner-path bullet below). The
+  Zodiac **Roles** modifier and the **Delay** modifier are enabled on it;
+  the everyday two-key path goes through the Delay. The whole book
   sits behind the modules, so a Roles bug reaches all of it; the
   mitigations are the pinned versions, members that are EOAs never Safes
   (the June 2026 bug's shape), the security page watched, the per-period
@@ -99,13 +106,19 @@ session notes):
   bundle. The guard derives the bounds on-chain instead of trusting the
   caller's parameters:
   - **The reference price** is the pool's time-weighted price (`observe`),
-    never `slot0`, which is what the attacker moves. Sales get a wider
-    band and a shorter window than buys, by parameter: a sale at spot in a
-    deep pool during a crash sits far below the time-weighted price and is
-    the market, not an attack, and the owner must be able to sell into a
-    crash with the home key alone. The depth multiple scales with the band
-    (below), so the wider band costs an attacker proportionally more depth
-    to abuse.
+    never `slot0`, which is what the attacker moves. The checks below
+    apply to **buys**. **Sales carry no price or depth check by default**
+    (owner, 2026-11-05): a rug must be exitable at once with the home key,
+    and a lagging time-weighted price would lock the owner in; with the
+    allowlist and the degen allowance in place the checks need not be
+    stringent anywhere, and the buy-side defaults are loose, tightened per
+    pool by the owner. Two things hold on every sale regardless: the guard
+    sells only through a pool the registry knows for the token (the listed
+    pool, or the pool a degen token was first bought in), never one the
+    caller names, so a thief cannot route a sale to a pool of their own;
+    and the sell band stays a per-pool parameter, off unless set, for a
+    position where a sandwich by a thief outweighs the rug risk. The
+    residual is in the Consequences.
   - **A swap** pulls the input from its caller, the Safe, computes the
     minimum output
     from the reference price less a maximum deviation, calls the listed
@@ -130,13 +143,13 @@ session notes):
     holds for any pair, a shitcoin against a tokenized stock included: the
     depth within the band, on the side the trade consumes, must be at
     least N times the trade size, or the call reverts. N is a policy
-    parameter per pool, not a rule of the guard: for listed pools it
-    defaults to the band over twice the fee (about one half on a 1% pool
-    with a 1% band, about ten on a 0.05% pool), which is mild at realistic
-    settings and deep pools clear without noticing; it is set to zero where the owner wants size in a
-    thin pool (the degen allowance below), since a conservative multiple
-    would stop the owner aping a fresh launch, which is sometimes the
-    trade. Depth can be flash-added to pass the floor, which is harmless
+    parameter per pool, not a rule of the guard. The multiple that makes
+    the inequality hold is the band over twice the fee (about one half on
+    a 1% pool with a 1% band, about ten on a 0.05% pool), mild at realistic
+    settings; the default is looser still or zero (owner, 2026-11-05), set
+    per pool where the owner wants it, and zero on the degen path, since a
+    conservative multiple would stop the owner aping a fresh launch, which
+    is sometimes the trade. Depth can be flash-added to pass the floor, which is harmless
     at a fair price and caught by the price check otherwise; the two
     checks hold together, neither alone.
   - **An absolute floor through a pricing path**, as a sanity bound on top.
@@ -178,26 +191,27 @@ session notes):
     oracle cardinality of one, so `observe` over the window reverts until
     it is grown and filled; the guard lets a buy in such a pool through on
     the absolute floor and the degen allowance alone, without the price
-    check, and that is the degen path by construction. The engine grows
-    the pool's cardinality in the same batch as its first buy, so the
-    window without a reference price is short, and a **sale** is
-    band-checked wherever a time-weighted price exists: the only holdings
-    a thief could dump at a bad price into a pool of their own are the
-    ones just bought, which the allowance already bounds. **Probation:** a
-    token listed from the home key keeps counting against the degen
-    allowance for its first N days (N a two-key parameter, a week or a
-    month), and takes the listed path's parameters and notional after.
-    Without it a stolen home key would list its coin after a day and buy
-    it on the listed path. Launches on v2 pairs and on v4 are outside the
-    guard and so outside the role.
+    check, and that is the degen path by construction. The registry
+    records the pool of that first buy as the token's pool, which is where
+    the guard will sell it. The engine grows the pool's cardinality in the
+    same batch as its first buy, so a sell band can be switched on for the
+    position later if wanted. Launches on v2 pairs and on v4 are outside
+    the guard and so outside the role.
   - **The registry holds the policy the guard reads (option B, owner,
-    2026-11-05).** One contract per chain, owned by the Safe (two keys),
-    holding: the listed set; per pool, the deviation band, the tick
-    distance, the depth multiple, the absolute floor and the pricing path,
-    each with a default applied at listing; and two running per-period
-    notionals in stablecoin terms through the pricing path, one for the
-    listed path and one for the degen path, which the guard debits with
-    the value of what is **bought** on every swap and open. Buys of the
+    2026-11-05).** One contract per chain, owned by the funded Safe (so
+    two keys through the Delay, or three direct), holding: the listed set,
+    and for every token the pool the guard trades it in; per pool, the
+    deviation band, the tick distance, the depth multiple, the absolute
+    floor, the pricing path and the sell band, each with a default applied
+    at listing; two running per-period notionals in stablecoin terms
+    through the pricing path, one for the listed path and one for the
+    degen path, which the guard debits with the value of what is
+    **bought** on every swap and open; and a **pause flag** (owner,
+    2026-11-05): any role member sets it with a role call, at once, and
+    the guard refuses every call while it is set; clearing it is the
+    owner's, two keys through the Delay. It is what bounds a compromised
+    app key the moment the owner notices, since removing a role member is
+    a two-key change. Buys of the
     reserve set (the stablecoins and WETH, a two-key list) count for
     nothing, so a sale of any token into them is never capped: de-risking
     is not an exit. Listing a token needs no allowance entry: the notionals
@@ -209,22 +223,26 @@ session notes):
   - **The listing Delay: the home key alone can add a token, after a
     cooldown.** A Zodiac Delay modifier whose target is the registry and
     whose only module is the home Ledger's EOA. It can queue one thing,
-    an add with the default parameters; after the cooldown (a day or two)
-    anyone executes it. Loosening a pool's parameters or raising a
-    notional is two-key, as is any other policy change: otherwise a
-    coercer would queue "list my token, multiple zero". Removing a token
-    is a role call, immediate, since narrowing is always safe. The Delay's
-    owner, who can skip a queued entry (`setTxNonce`), is **the vault
-    key**: there is no off-site key holder in this design, and a guardian
-    who can veto a listing alone is left open as an optional improvement.
-    So under a wrench attack a coerced listing does not fail by itself; it
-    costs the attacker the whole cooldown with the owner in hand while the
-    entry sits visible on chain, which is what the monitoring step
-    watches. After the cooldown the attacker's token is on the listed
-    path, where the band means nothing (their pool, their price) but the
-    absolute floor, the default depth multiple and the listed path's
-    per-period notional still hold; that notional is the second number
-    the owner sizes with a wrench in mind, after the degen allowance.
+    an add with the default parameters; after the cooldown (**three days**,
+    the owner's number, 2026-11-05) anyone executes it. Loosening a pool's
+    parameters or raising a notional is two-key, as is any other policy
+    change: otherwise a coercer would queue "list my token, multiple
+    zero". Removing a token is a role call, immediate, since narrowing is
+    always safe. The Delay's owner, who can skip a queued entry
+    (`setTxNonce`), is **the vault key**; a guardian who can veto a listing
+    alone is left open as an optional improvement. **The listing is queued
+    from the tracker's UI**: the app builds the call, the home Ledger
+    signs it through Rabby, the app's worker executes the entry once the
+    cooldown has passed (executing needs no permission, only gas), and the
+    app shows what is queued and when it executes; the vault key's skip is
+    a Rabby flow too. No second app: it would be a second thing to secure
+    for nothing. **The listing attack is accepted** (owner, 2026-11-05):
+    whoever holds the home key can list a coin of their own and, after the
+    cooldown, buy it on the listed path up to that path's per-period
+    notional. The cooldown, the vault key's skip and the monitoring step
+    are the answer, not a probation on new listings (an option, in the
+    roadmap). That notional is the second number the owner sizes with a
+    wrench in mind, after the degen allowance.
   - **The approver: one module on the Safe, one function.** It makes the
     Safe approve the guard for a token, any token, and nothing else; it
     trusts the guard alone, and the guard invokes it only when the Safe is
@@ -277,25 +295,29 @@ session notes):
   before the proceeds are collected. The engine's own rules (rung sizing,
   icebergs, reload cycles) are the tracker's, recorded in its
   execution-engine ADR.
-- **A cooldown on withdrawals — open choice, corrected 2026-10-24.** The
-  Delay modifier delays only what reaches the Safe *through it as a module*;
-  owners who sign directly are never delayed (Zodiac's own docs). So "a
-  delay on the two-key path" is one of two constructions, not a setting:
-  - **(a) No delay.** The two owners sign directly; the wrench defence is the
-    vault key alone. Simplest, nothing can brick the Safe.
-  - **(b) The owner path routed through Delay.** A second Safe holding no
-    funds, the same 2-of-3 owners, is the module enabled on the trading
-    Safe's Delay; the trading Safe's own owner set is made unable to sign
-    (its single owner the Delay contract, which cannot produce a
-    signature), so every non-role action — a withdrawal, a policy change —
-    is queued by that second Safe, waits the
-    cooldown (a day or two), and can be cancelled during it by the Delay's
-    owner (the home key, or the off-site third party). A coerced two-key
-    withdrawal then needs the attacker to hold the owner for the whole
-    delay. Cost: the trading Safe has no direct owner path at all, so a
-    Delay bug or a stuck queue needs the queue's own skip (`setTxNonce`) or
-    the expiration to clear; rehearse both on a fork before choosing it.
-  Role calls bypass the delay in both constructions by design.
+- **The owner path, decided 2026-11-05 (owner): three keys direct, two
+  keys through the Delay.** The Delay modifier delays only what reaches
+  the Safe *through it as a module*; owners who sign directly are never
+  delayed (Zodiac's own docs). With two keys alone there is no
+  construction where a delay binds them and they can still rescue the
+  book from a Delay bug, which is why the third key is load-bearing:
+  - **Direct, 3 of 3.** The funded Safe's own threshold. The break-glass
+    that no module, ours or Zodiac's, can lock: a bug anywhere, the three
+    keys withdraw everything at once. Impractical under a wrench, since it
+    means home, the bank and the off-site place in one trip.
+  - **Everyday, 2 of 3, delayed.** A second Safe holding no funds, the same
+    three owners at threshold 2, is the module enabled on the funded
+    Safe's Delay. Every non-role action — a withdrawal, a policy change, a
+    notional raised, the pause cleared — is queued by two keys, waits the
+    cooldown (configurable; a day or two), and anyone executes it after.
+    The Delay's owner is the funded Safe itself, so shortening the
+    cooldown or skipping an entry takes all three keys. A coerced two-key
+    withdrawal needs the attacker to hold the owner through the whole
+    cooldown while the entry sits visible on chain (the monitoring step);
+    an owner who is free during it moves the funds with three keys first.
+    A lost key leaves this path intact with the other two.
+  Rehearse the skip and the expiration on a fork. Role calls bypass the
+  Delay by design.
 - **Swaps go through the guard, on every chain, v3 routers first.** On
   Robinhood Chain the guard calls Uniswap v3's SwapRouter02; v4 pools stay
   outside the role until the queued decision above gives the guard a
@@ -327,9 +349,16 @@ session notes):
 - **Trading is by API wallets**, approved once by the multi-sig: the owner's
   browser agent and the app's KMS key. API wallets cannot withdraw by
   Hyperliquid's own rules.
-- **Deposits** go from the Safe to that account's Arbitrum address
-  (the one transfer-out the role allows, capped by an allowance), then from
-  that address into the bridge. The account's Arbitrum key is kept at home.
+- **Deposits have a hop, which is why they are capped.** Hyperliquid
+  credits a deposit to the address that sent it, and that address must be
+  able to sign Hyperliquid's own messages, which a Safe cannot. So the
+  Safe first transfers USDC to the trading account's own address on
+  Arbitrum (the one transfer out of the Safe to a non-Safe address the
+  role allows), and that address sends it into the bridge. That address
+  is an ordinary account whose key is kept at home, and whoever holds that
+  key can send whatever reaches it anywhere; the per-period allowance on
+  the transfer is sized to the typical deposit, nothing more, so a stolen
+  home key takes at most one period's deposits by this route.
 - **Withdrawing from Hyperliquid is a two-key action.** This is the one
   requirement the design does not meet: whoever can withdraw on Hyperliquid
   can choose any destination, and the multi-sig threshold is the only lever.
@@ -354,8 +383,10 @@ session notes):
 
 ### Boundaries and rules
 
-- **This repository** holds the custody layer: the policies as code, the
-  guard, the registry and the approver, the apply and verify scripts, the fork test suite, the
+- **This repository** holds the custody layer: the user stories
+  (`docs/stories.md`) the design is measured against, the policies as
+  code, the guard, the registry and the approver, the apply and verify
+  scripts, the fork test suite, the
   Safe deployment scripts, the Hyperliquid multi-sig tooling, the KMS
   signer service. The portfolio
   tracker keeps the execution engine and talks to this layer through a
@@ -395,15 +426,21 @@ session notes):
    skips it; a home-key call that loosens a parameter or raises a notional
    reverts; a removal by the role is immediate), the approver (refuses any
    caller but the guard and any spender but the guard; a degen token
-   bought in one block is sold in the next), the close permission on the
+   bought in one block is sold in the next, through the pool it was bought
+   in, and a sale routed to another pool reverts), the pause (set by a
+   role call, the guard refuses everything; cleared only through the
+   Delay), the close permission on the
    position manager (a partial fill decreased and collected to the Safe, a
    reload cycle as one MultiSend), the bridge permission, the Hyperliquid
    deposit transfer under its allowance, and the must-fail list, with a
    direct router call, a direct `mint`, the position NFT's transfers and
    approvals, an approval to another spender or above the allowance, and a
    `collect` to another recipient among it.
-3. Safe deployment at the same address on Robinhood Chain; a role call
-   through Rabby with the Ledger; the Delay cooldown and its cancel.
+3. Safe deployment at the same address on Robinhood Chain, the funded
+   Safe at 3 of 3 and the 2-of-3 Safe on its Delay; a role call through
+   Rabby with the Ledger; a two-key withdrawal that waits the cooldown; a
+   three-key withdrawal that does not, with a module disabled; the skip
+   by three keys and the expiration.
 4. The guard's audit, its findings closed in the fork suite, before any real
    funds pass through it.
 
@@ -412,16 +449,18 @@ session notes):
 - **Daily use, one Ledger tap, no vault key:** swaps through Pilot on
   supported chains and through the app's panel on Robinhood Chain; bridges
   the same way; Hyperliquid deposits from the app; Hyperliquid trading with
-  the browser agent. **Rare, with the vault key:** withdrawing from
-  Hyperliquid, moving anything out of the Safe, changing the policy (two
-  owners in Safe{Wallet} or Rabby's Safe mode; under construction (b)
-  above, queued through the Delay and executed after the cooldown).
+  the browser agent. **Rare, with two keys:** withdrawing from
+  Hyperliquid, moving anything out of the Safe, changing the policy,
+  clearing the pause (two owners of the 2-of-3 Safe in Safe{Wallet} or
+  Rabby's Safe mode, queued through the Delay, executed after the
+  cooldown). **Rarest, with all three keys:** the break-glass withdrawal,
+  shortening a cooldown, skipping a queued entry.
 - **Changing the policy** is a non-role action with one exception.
   Listing a token is the home key's alone, through the listing Delay and
   its cooldown, with default parameters. Everything else (a new router or
   bridge, a pool's parameters loosened, a notional raised, the Roles
   configuration itself, whose owner is the Safe) is a Safe transaction by
-  two owners (and, under (b), through the cooldown). A role member cannot
+  two owners through the Delay and its cooldown. A role member cannot
   widen its own role beyond that one delayed add — the point of the
   design, and the reason the other changes are batched for the vault
   key's visits.
@@ -431,16 +470,21 @@ session notes):
   the degen allowance: a coerced buy of the attacker's token in a pool the
   attacker has funded past the absolute floor, capped per period. A
   coerced listing costs the attacker the cooldown with the owner in hand,
-  visible on chain, and then, for the probation, still only the degen
-  allowance; after it, at most the listed path's per-period notional in a
-  pool that clears the floors. It cannot send anything elsewhere.
+  visible on chain, and then at most the listed path's per-period
+  notional in a pool that clears the floors. It cannot send anything
+  elsewhere.
 - **A stolen home key**, with no owner to coerce, takes the degen
-  allowance per day and nothing else, listing or not, for as long as the
-  probation runs; the residuals are the Hyperliquid deposit allowance if
-  that account's key is kept with the home key, and a dump of just-bought
-  degen holdings into a pool of the thief's own, which the allowance
-  already bounds. The vault key skips any listing the thief queued, which
-  is what the monitoring step is for.
+  allowance per day. The residuals, each accepted by the owner
+  (2026-11-05): after the three-day listing cooldown, the listed path's
+  per-period notional into a pool of the thief's own, unless the vault key
+  skips the listing first; the Hyperliquid deposit allowance, if that
+  account's key is kept with the home key; and, since sales carry no
+  price check by default, a sandwich of the Safe's own sales in their
+  real pool by a thief who also has the capital to move that pool (which
+  they get back), bounded only by the pool's depth and the sell band
+  where the owner has set one. The pause flag ends all of it the moment
+  the owner notices, with the home key; the monitoring step is what makes
+  noticing likely.
 - Custom Solidity is the guard, the registry and the approver: holding no
   funds, with no admin beyond the Safe, audited together, their reverts in
   the fork suite. The guard is in the trust path through the approvals it

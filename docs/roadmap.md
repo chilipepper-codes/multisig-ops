@@ -6,9 +6,12 @@ built yet (2026-10-24).
 
 ## Decided (ADR-001)
 
-EVM: one funded Safe per chain (amended 2026-11-04: the vault Safe is
-dropped, all on-chain capital trades; under construction (b) a fundless
-second Safe queues through the Delay), Roles on it, one trader role for
+The user stories in [`docs/stories.md`](stories.md) are the spec
+(owner, 2026-11-05). EVM: one funded Safe per chain (amended 2026-11-04:
+the vault Safe is dropped, all on-chain capital trades), three owner keys
+at **3 of 3 for the direct path** and a fundless 2-of-3 Safe queuing
+every other owner action through the Delay (decided 2026-11-05), Roles on
+it, one trader role for
 the home Ledger and the app's KMS key, scoped to swaps and CLMM
 range-order opens through **the guard** (decided 2026-11-04: an admin-less,
 unowned contract that checks the pool's time-weighted price and depth and
@@ -18,8 +21,11 @@ deposit, and buys of unlisted tokens under a per-period degen allowance
 (the one priced exit, shaped by the wrench attack); the token set, the
 per-pool parameters and the per-period notionals in a **registry** the
 guard reads, where the home key alone can add a token behind a **listing
-Delay** owned by the vault key (amended 2026-11-05), and an **approver**
-module that grants the guard its token approvals; the CoW presets out; Hyperliquid: native
+Delay** owned by the vault key with a three-day cooldown (amended
+2026-11-05; the listing attack accepted), an **approver** module that
+grants the guard its token approvals, no price or depth checks on sales
+by default, and a **pause flag** any role member can set; the CoW presets
+out; Hyperliquid: native
 multi-sig with API wallets; the app's key in Cloud KMS; fork tests before
 any policy goes live; agents never hold a key, never touch mainnet.
 
@@ -42,10 +48,11 @@ any policy goes live; agents never hold a key, never touch mainnet.
    list (ADR-001); the
    apply and verify scripts that read the modifier's events (no subgraph
    on Robinhood Chain).
-3. **Same-address Safes by script**, the Delay cooldowns (the owner path
-   under construction (b), the listing Delay with the vault key as its
-   owner), a role call and a queued listing through Rabby with the
-   Ledger — on testnets first.
+3. **Same-address Safes by script** (the funded Safe at 3 of 3, the
+   2-of-3 Safe on its Delay), the Delay cooldowns (the owner path's, owned
+   by the funded Safe; the listing Delay's, owned by the vault key), a
+   role call and a queued listing through Rabby with the Ledger — on
+   testnets first.
 4. **Hyperliquid on testnet**: the multi-sig conversion, agent approval
    through the multi-sig, trading through the agent, a withdrawal refusing
    one signature. The multisig UI: Hyperliquid's own, or the open-source
@@ -61,9 +68,9 @@ any policy goes live; agents never hold a key, never touch mainnet.
    Delay, every entry on the owner-path Delay and every role execution,
    since a coerced listing is delayed and visible rather than refused, and
    the veto is worth nothing unseen.
-8. **Go live in stages**: the Safe with threshold 1 for a week, then the
-   vault key and threshold 2; Hyperliquid last, since conversion is
-   one-way.
+8. **Go live in stages**: the funded Safe at threshold 1 for a week, then
+   the three owners at 3 of 3 with the 2-of-3 Safe on the Delay;
+   Hyperliquid last, since conversion is one-way.
 
 ## Queued, no decision made
 
@@ -110,6 +117,10 @@ decided and another solution possible when the work is taken up:
   can veto a queued listing alone while the owner is held; today the
   owner holds all three keys and the Delay's owner is the vault key
   (ADR-001).
+- **Probation for new listings**: a token listed from the home key keeps
+  counting against the degen allowance for its first days, closing the
+  listing attack the owner accepted (ADR-001); a timestamp in the
+  registry if ever wanted.
 - **Scheduled policy drift checks**: the fork suite on a schedule against
   the live policy, since routers and protocols move.
 - **A wrench-attack and key-loss drill**: a written runbook and a dry run
