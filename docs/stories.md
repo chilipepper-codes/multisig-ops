@@ -61,7 +61,10 @@ the signer service. Agents never hold any key and never touch mainnet.
 8. **I can bridge any held token to my own Safe on another chain with the
    home key.** The guard's bridge: any token, listed or not, the
    destination pinned to the Safe's own address on the other chain, no
-   cap. Residual: none.
+   cap. The destination is a parameter of the bridge call, so it is in
+   the transaction the Safe signs and the guard sets it to its caller;
+   bridges whose recipient lives only in an off-chain quote are not role
+   calls. Residual: none.
 
 ## Listing
 
@@ -102,13 +105,15 @@ the signer service. Agents never hold any key and never touch mainnet.
     Arbitrum address (the one transfer out the role allows, capped), and
     that address sends it to the bridge. The cap is the typical deposit
     size, because that address is an ordinary account whose key is kept
-    at home. Residual: one period's deposits, story 10. **To verify
-    (build step 4):** the Safe itself as the Hyperliquid account, through
-    a same-address Safe on HyperEVM acting on HyperCore via CoreWriter
-    (Roles is deployed there; the Delay to confirm), which would make the
-    deposit a plain role call into the bridge with no hop and no
-    allowance, and the withdrawal back to the wallet a home-key action
-    (ADR-001, Hyperliquid).
+    at home. Residual: one period's deposits, story 10. **Recommended,
+    to confirm on testnet:** the Safe itself as the Hyperliquid account,
+    through a same-address Safe on HyperEVM whose Roles scope CoreWriter
+    directly (the whole Zodiac stack is deployed there; no custom code),
+    fed by CCTP with the recipient pinned in the signed calldata: no hop,
+    no allowance, and the withdrawal back to the wallet a home-key action
+    (ADR-001, Hyperliquid). The same rail with the recipient pinned to
+    the native multi-sig account removes the hop and the allowance even
+    if the Safe path is not taken.
 14. **Trading on Hyperliquid needs no owner key; withdrawing from it needs
     two.** API wallets (the owner's browser agent, the app key) trade and
     cannot withdraw by Hyperliquid's own rules; the account is a native

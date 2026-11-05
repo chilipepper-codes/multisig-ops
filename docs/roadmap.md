@@ -17,7 +17,10 @@ range-order opens through **the guard** (decided 2026-11-04: an admin-less,
 unowned contract that checks the pool's time-weighted price and depth and
 delivers everything to the Safe; v3-shaped pools only until it has a
 reference price on v4), range-order closes, bridges and the Hyperliquid
-deposit, and buys of unlisted tokens under a per-period degen allowance
+deposit (recommended, to confirm on testnet: the Safe itself as the
+Hyperliquid account, fed by CCTP with the recipient pinned, its Roles
+scoping CoreWriter directly), and buys of unlisted tokens under a
+per-period degen allowance
 (the one priced exit, shaped by the wrench attack); the token set, the
 per-pool parameters and the per-period notionals in a **registry** the
 guard reads, where the home key alone can add a token behind a **listing
@@ -53,14 +56,17 @@ any policy goes live; agents never hold a key, never touch mainnet.
    by the funded Safe; the listing Delay's, owned by the vault key), a
    role call and a queued listing through Rabby with the Ledger — on
    testnets first.
-4. **Hyperliquid on testnet**: first, whether the Safe itself can be the
-   account (ADR-001: a same-address Safe on HyperEVM acting on HyperCore
-   through CoreWriter; Roles is deployed there, the Delay and the proxy
-   factory to confirm; the deposit credited to the Safe; API wallets
-   approved through CoreWriter; funds moved back to the HyperEVM Safe and
-   bridged to Arbitrum over CCTP with the recipient pinned), which would
-   retire the hop, its allowance and the native multi-sig and give the
-   home key the Hyperliquid withdrawal; otherwise the multi-sig conversion, agent approval
+4. **Hyperliquid on testnet**: first, the Safe itself as the account
+   (ADR-001: a same-address Safe on HyperEVM whose Roles scope CoreWriter
+   as `Calldata`; the whole Zodiac stack is deployed there, read from the
+   chain; a CCTP deposit with the recipient pinned in the hook data,
+   credited to the Safe; API wallets approved through CoreWriter by two
+   keys; funds moved back to the HyperEVM Safe and bridged to Arbitrum
+   over CCTP with the recipient pinned; the fire-and-forget actions
+   confirmed through the precompiles), which would retire the hop, its
+   allowance and the native multi-sig and give the home key the
+   Hyperliquid withdrawal; otherwise the native multi-sig account fed by
+   the same CCTP rail with the recipient pinned to it, and then the multi-sig conversion, agent approval
    through the multi-sig, trading through the agent, a withdrawal refusing
    one signature, and the multisig UI (Hyperliquid's own, or the
    open-source signer).
