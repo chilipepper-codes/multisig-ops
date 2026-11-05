@@ -104,9 +104,11 @@ the signer service. Agents never hold any key and never touch mainnet.
     size, because that address is an ordinary account whose key is kept
     at home. Residual: one period's deposits, story 10. **To verify
     (build step 4):** the Safe itself as the Hyperliquid account, through
-    a same-address Safe on HyperEVM acting on HyperCore via CoreWriter,
-    which would make the deposit a plain role call into the bridge with no
-    hop and no allowance (ADR-001, Hyperliquid).
+    a same-address Safe on HyperEVM acting on HyperCore via CoreWriter
+    (Roles is deployed there; the Delay to confirm), which would make the
+    deposit a plain role call into the bridge with no hop and no
+    allowance, and the withdrawal back to the wallet a home-key action
+    (ADR-001, Hyperliquid).
 14. **Trading on Hyperliquid needs no owner key; withdrawing from it needs
     two.** API wallets (the owner's browser agent, the app key) trade and
     cannot withdraw by Hyperliquid's own rules; the account is a native
@@ -115,7 +117,8 @@ the signer service. Agents never hold any key and never touch mainnet.
     Hyperliquid withdrawal can go to any destination, so the balance there
     is kept at trading size. If the Safe becomes the account (story 13's
     verification), the withdrawal becomes story 2's path instead and the
-    residual goes away.
+    residual goes away: funds come back to the HyperEVM Safe with the home
+    key, and leaving the Safe system is story 2.
 
 ## Operations
 

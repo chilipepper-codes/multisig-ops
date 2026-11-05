@@ -55,10 +55,12 @@ any policy goes live; agents never hold a key, never touch mainnet.
    testnets first.
 4. **Hyperliquid on testnet**: first, whether the Safe itself can be the
    account (ADR-001: a same-address Safe on HyperEVM acting on HyperCore
-   through CoreWriter; Zodiac's deployment there; the deposit credited to
-   the Safe; API wallets approved through CoreWriter; funds moved back to
-   the HyperEVM Safe), which would retire the hop, its allowance and the
-   native multi-sig; otherwise the multi-sig conversion, agent approval
+   through CoreWriter; Roles is deployed there, the Delay and the proxy
+   factory to confirm; the deposit credited to the Safe; API wallets
+   approved through CoreWriter; funds moved back to the HyperEVM Safe and
+   bridged to Arbitrum over CCTP with the recipient pinned), which would
+   retire the hop, its allowance and the native multi-sig and give the
+   home key the Hyperliquid withdrawal; otherwise the multi-sig conversion, agent approval
    through the multi-sig, trading through the agent, a withdrawal refusing
    one signature, and the multisig UI (Hyperliquid's own, or the
    open-source signer).

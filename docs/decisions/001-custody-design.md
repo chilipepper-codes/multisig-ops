@@ -372,33 +372,69 @@ session notes):
   Accepted: the Hyperliquid balance is kept at trading size, and
   withdrawals are planned. The alternative, the account on the home key,
   leaves the whole balance wrench-exposed.
-- **To verify in build step 4 (2026-11-05): the Safe itself as the
-  Hyperliquid account.** The owner asked whether a bridge aggregator could
-  deposit without the hop. An aggregator cannot change Hyperliquid's rule
-  that a deposit is credited to the address that sent it, so by itself it
-  does not; but the rule cuts the other way too: USDC the Arbitrum Safe
-  sends to the bridge contract is credited to the Safe's own address on
-  HyperCore. What made that address useless was that a Safe cannot sign
-  Hyperliquid's messages. Since 2025 HyperEVM has the CoreWriter system
-  contract, through which a contract at an address acts for that address
-  on HyperCore (orders, spot sends, transfers between spot and perp, vault
-  transfers; the full action list, and whether approving an API wallet is
-  among them, is to be read from Hyperliquid's own docs), and Safe is live
-  on HyperEVM. So a Safe at the same address on HyperEVM, with Roles and
-  the Delay if the Zodiac mastercopies are deployed there (unconfirmed),
-  would own the HyperCore account: the Arbitrum Safe deposits straight
-  into the bridge as a role call, with no hop, no home-kept key and no
-  allowance; the API wallets are approved once through CoreWriter; moving
-  funds from HyperCore to the HyperEVM Safe is a transfer between the
-  owner's own addresses, and bridging out of that Safe is a withdrawal
-  like any other, two keys through the Delay with the destination pinned.
-  That would retire the native multi-sig, the deposit hop and its
-  allowance, and the one unmet requirement above. Caveats to settle on
-  testnet: CoreWriter actions are fire-and-forget (the EVM transaction
-  succeeds whether or not HyperCore accepts the action, so the engine
-  confirms by reading HyperCore state); the exact deposit and withdrawal
-  mechanics between HyperEVM and HyperCore; the Zodiac deployment. Until
-  verified, the native multi-sig design above stands.
+- **To verify in build step 4 (2026-11-05, researched the same day): the
+  Safe itself as the Hyperliquid account.** The owner asked whether a
+  bridge aggregator could deposit without the hop. The rule that a deposit
+  is credited to the address that sent it cuts both ways: USDC the
+  Arbitrum Safe sends to the bridge contract is credited to the Safe's own
+  address on HyperCore, and what made that address useless was only that
+  a Safe cannot sign Hyperliquid's messages. HyperEVM's CoreWriter system
+  contract changes that: a contract at an address acts for that address
+  on HyperCore, and the action list in Hyperliquid's own docs includes
+  what the account needs (9, add API wallet; 7, USD class transfer; 6,
+  spot send; 13, send asset; 1, 10, 11, orders and cancels), attributed
+  to the calling contract. Safe is live on HyperEVM, and the **Roles
+  2.1.1 mastercopy is deployed there at its canonical address** (the
+  official deployments list). So a Safe at the same address on HyperEVM,
+  with Roles and, once confirmed there, the Delay, would own the HyperCore
+  account:
+  - **Deposits** are a role call from the Arbitrum Safe straight into the
+    bridge contract, credited to the Safe's address: no hop, no home-kept
+    key, no allowance. From other chains, first to the Arbitrum Safe over
+    a bridge with the destination pinned, then the same.
+  - **API wallets** (the owner's browser agent, the app's KMS key) are
+    approved once through CoreWriter from the HyperEVM Safe, a two-key
+    action through the Delay like any grant of trading rights. Trading
+    itself is unchanged: the API wallet signs off-chain.
+  - **Withdrawing from Hyperliquid back to the wallet** becomes a transfer
+    between the owner's own addresses, and so a role call with the home
+    key alone: a USD class transfer to spot, then a send to the USDC
+    system address, which HyperCore pays out by an ERC-20 transfer to the
+    sender's own HyperEVM address, the Safe. Native USDC and CCTP v2 are
+    live on HyperEVM (Circle, 2025), so bridging from there to the
+    Arbitrum Safe is a burn with the mint recipient pinned, another role
+    call. Leaving the Safe system is the two-key delayed path as
+    everywhere. That meets requirement 2 for Hyperliquid, which the
+    native multi-sig design never could, and retires the multi-sig, the
+    hop and its allowance.
+  - **Aggregators**, to the owner's question: an intent bridge (Relay,
+    Jumper) delivers to any Hyperliquid address because its solver pays
+    the recipient on HyperCore from its own balance while the source funds
+    go to the relayer; that is right, but the recipient lives in the
+    off-chain quote, not in the calldata the Safe signs, so the Safe's
+    leg is a transfer to the relayer that Roles cannot pin. Not a role
+    call. The native bridge from Arbitrum is pinnable and needs no solver;
+    an order-based bridge whose receiver sits in calldata (deBridge's
+    orders) could be, if it settles on HyperCore, unconfirmed.
+  - **Nothing off the shelf does this for a Safe.** The pattern is the
+    standard one for HyperEVM vault protocols, which Hyperliquid's docs
+    steer new vaults to (an ERC-4626 contract trading on HyperCore through
+    CoreWriter), and `hyper-evm-lib` wraps every CoreWriter action and the
+    EVM-to-Core bridging with a local simulator for Foundry tests; a Safe
+    with Roles doing the same is a composition of those pieces, not a
+    product anyone ships.
+  - **To settle on testnet, and what could sink it:** the Delay 1.1.1
+    mastercopy and the module proxy factory on HyperEVM (Zodiac says one
+    address on every supported chain; the Roles list confirms HyperEVM,
+    the Delay list was not reachable from the session); CoreWriter actions
+    are fire-and-forget (the EVM transaction succeeds whether or not
+    HyperCore accepts the action, so the engine confirms by reading
+    HyperCore state through the precompiles); the Safe's HyperCore account
+    must exist before an action, which the first deposit creates; a
+    unified account rejects spot send and needs send asset; the Safe
+    needs HYPE for gas on HyperEVM; the exact USDC path between HyperCore
+    and HyperEVM (the system address, Circle's deposit wallet). Until
+    verified, the native multi-sig design above stands.
 
 ### The app's key
 
