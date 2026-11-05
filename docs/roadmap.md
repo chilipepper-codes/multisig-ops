@@ -10,12 +10,16 @@ EVM: one funded Safe per chain (amended 2026-11-04: the vault Safe is
 dropped, all on-chain capital trades; under construction (b) a fundless
 second Safe queues through the Delay), Roles on it, one trader role for
 the home Ledger and the app's KMS key, scoped to swaps and CLMM
-range-order opens through **the guard** (decided 2026-11-04: a stateless,
+range-order opens through **the guard** (decided 2026-11-04: an admin-less,
 unowned contract that checks the pool's time-weighted price and depth and
 delivers everything to the Safe; v3-shaped pools only until it has a
 reference price on v4), range-order closes, bridges and the Hyperliquid
 deposit, and buys of unlisted tokens under a per-period degen allowance
-(the one priced exit, shaped by the wrench attack); the CoW presets out; Hyperliquid: native
+(the one priced exit, shaped by the wrench attack); the token set, the
+per-pool parameters and the per-period notionals in a **registry** the
+guard reads, where the home key alone can add a token behind a **listing
+Delay** owned by the vault key (amended 2026-11-05), and an **approver**
+module that grants the guard its token approvals; the CoW presets out; Hyperliquid: native
 multi-sig with API wallets; the app's key in Cloud KMS; fork tests before
 any policy goes live; agents never hold a key, never touch mainnet.
 
@@ -24,20 +28,24 @@ any policy goes live; agents never hold a key, never touch mainnet.
 1. **The fork test harness**: a Safe + Roles + Delay deployment on a fork of
    each chain, a policy applied, the allowed list passing and the must-fail
    list reverting. The acceptance test everything else is measured against.
-2. **The guard and the policy as code.** The guard contract (swap and
-   range-order open; time-weighted reference price, deviation band, tick
-   distance, a depth floor relative to the trade and an absolute one
-   through a pricing path over the chain's own pools; stateless, unowned)
-   with its fork tests,
-   and the policies for Base, Arbitrum, Ethereum and Robinhood Chain:
-   approvals pinned to the guard, a bridge or Permit2 and exact, the
-   guard's parameters pinned per pool, the position manager's close
-   functions with the proceeds pinned to the Safe, the native bridge, the
-   Hyperliquid deposit transfer under its allowance, and the must-fail list
-   (ADR-001); the apply and verify scripts that read the modifier's events
-   (no subgraph on Robinhood Chain).
-3. **Same-address Safes by script**, the Delay cooldown, a role call through
-   Rabby with the Ledger — on testnets first.
+2. **The guard, the registry, the approver and the policy as code.** The
+   guard (swap and range-order open; time-weighted reference price,
+   deviation band, tick distance, a depth floor relative to the trade and
+   an absolute one through a pricing path over the chain's own pools), the
+   registry (the listed set, per-pool parameters with defaults, the two
+   per-period notionals) and the approver, with their fork tests; the
+   listing Delay in front of the registry; and the policies for Base,
+   Arbitrum, Ethereum and Robinhood Chain: the guard's functions for the
+   trader role, approvals on listed tokens to a bridge or Permit2, the
+   position manager's close functions with the proceeds pinned to the
+   Safe, the registry's remove, the native bridge, the Hyperliquid deposit
+   transfer under its allowance, and the must-fail list (ADR-001); the
+   apply and verify scripts that read the modifier's events (no subgraph
+   on Robinhood Chain).
+3. **Same-address Safes by script**, the Delay cooldowns (the owner path
+   under construction (b), the listing Delay with the vault key as its
+   owner), a role call and a queued listing through Rabby with the
+   Ledger — on testnets first.
 4. **Hyperliquid on testnet**: the multi-sig conversion, agent approval
    through the multi-sig, trading through the agent, a withdrawal refusing
    one signature. The multisig UI: Hyperliquid's own, or the open-source
@@ -45,11 +53,15 @@ any policy goes live; agents never hold a key, never touch mainnet.
 5. **The KMS signer service** and the tracker's intent API, whose intents
    include opening, reloading and closing a range order (a reload cycle is
    one MultiSend role call); the executor's bad-trade residual bounded by
-   the token list, the allowances (sized for the churn of reloads) and the
-   engine's checks.
-6. **The guard's audit**, its findings closed in the fork suite, before any
-   real funds pass through it.
-7. **Go live in stages**: the Safe with threshold 1 for a week, then the
+   the registry's listed set and notionals and the engine's checks.
+6. **The audit** of the guard, the registry and the approver, its findings
+   closed in the fork suite, before any real funds pass through them.
+7. **Monitoring** (owner, 2026-11-05: yes; its shape to be decided with
+   the owner): at the least an alert on every listing queued on the
+   Delay, every entry on the owner-path Delay and every role execution,
+   since a coerced listing is delayed and visible rather than refused, and
+   the veto is worth nothing unseen.
+8. **Go live in stages**: the Safe with threshold 1 for a week, then the
    vault key and threshold 2; Hyperliquid last, since conversion is
    one-way.
 
@@ -94,9 +106,10 @@ decided and another solution possible when the work is taken up:
 - **External feeds on the guard** (Chainlink, Pyth) as a sanity check on a
   tokenized stock's pricing hop, where a feed is deployed on the chain;
   never a dependency (ADR-001, the guard).
-- **Monitoring**: an alert on every role execution and every Delay queue
-  entry (Tenderly, OpenZeppelin Defender or our own watcher), so a coerced
-  or compromised use is seen within minutes.
+- **An off-site guardian** as the listing Delay's owner, a third party who
+  can veto a queued listing alone while the owner is held; today the
+  owner holds all three keys and the Delay's owner is the vault key
+  (ADR-001).
 - **Scheduled policy drift checks**: the fork suite on a schedule against
   the live policy, since routers and protocols move.
 - **A wrench-attack and key-loss drill**: a written runbook and a dry run

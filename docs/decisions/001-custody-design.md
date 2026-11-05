@@ -3,7 +3,9 @@
 **Status:** accepted as the design (owner, 2026-10-24); amended 2026-11-02 to
 scope CLMM range orders into the trader role; amended 2026-11-04 (owner):
 one funded Safe per chain, the guard contract decided in front of every swap and
-range-order open, the CoW presets out of the role; nothing built yet. Solana is
+range-order open, the CoW presets out of the role; amended 2026-11-05 (owner):
+the token registry behind a listing Delay the home key alone can queue on,
+and the approver module; nothing built yet. Solana is
 **proposed**, not decided (last section). Every "verify" line below is a
 testnet or fork step that precedes real funds.
 
@@ -73,23 +75,22 @@ session notes):
   allowances, and the guard below in front of every trade. "The trading
   Safe" below means this one Safe.
 - **One role, "trader", two members:** the home Ledger's EOA and the app's
-  KMS key. What the role allows, and nothing else: ERC-20 approvals on
-  listed tokens, the spender pinned to the guard, a listed bridge or
-  Permit2, the amount drawn from the token's per-period allowance (the
-  policy's bound: Roles checks each call on its own and cannot tie an
-  approval to the call that spends it, so "exact, and in the same batch"
-  is the engine's convention, not a guarantee; a leftover approval to the
-  guard is spendable only through the guard's own checks, since the guard
-  pulls from its caller); swaps and
-  range-order opens through the guard, which delivers everything to the
-  Safe (next bullets); closing a range position on the position manager
+  KMS key. What the role allows, and nothing else: calls to the guard
+  (swaps and range-order opens, on the listed path or the degen path as
+  the registry says; the guard delivers everything to the Safe, next
+  bullets); ERC-20 approvals on listed tokens to a listed bridge or
+  Permit2 (approvals to the guard are the approver module's, below, and
+  need no role call); closing a range position on the position manager
   with the proceeds pinned to the Safe; bridges whose destination is the
-  Safe's address on the other chain; a token allowlist; per-period
-  allowances; buys of unlisted tokens through the guard under the degen
-  allowance (the guard bullet); one transfer target outside the Safe, the
-  Hyperliquid deposit account below, under an allowance. An approval to
-  any other spender, and a transfer to any other address, is not a role
-  call: it needs two owners.
+  Safe's address on the other chain; removing a token from the registry;
+  one transfer target outside the Safe, the Hyperliquid deposit account
+  below, under an allowance. The token set, the per-pool parameters and
+  the per-period notionals are the registry's, not Roles conditions
+  (amended 2026-11-05: Roles scopes calls per target address and cannot
+  scope "approve on any token", so a token set in Roles would make every
+  listing, and every sale of a degen token, a Roles change). An approval
+  to any other spender, a call on a token contract outside those, and a
+  transfer to any other address, is not a role call: it needs two owners.
 - **The guard (decided 2026-11-04): one contract in front of every swap and
   every range-order open.** Roles conditions compare calldata and cannot
   see a price, so a compromised engine could trade through a thin or
@@ -132,9 +133,8 @@ session notes):
     tokenized stocks). The guard values the quote through the chain's own
     pools: at most two hops to a stablecoin or WETH (coin to stock token,
     stock token to USDC), each hop a time-weighted price in a pool that
-    must clear its own relative floor. The path is a parameter pinned per
-    pool by the policy, like the band and the multiple, so the guard stays
-    stateless. For a tokenized stock its USDC pool on the chain is its
+    must clear its own relative floor. The path is a registry parameter
+    per pool, like the band and the multiple. For a tokenized stock its USDC pool on the chain is its
     on-chain market and the natural source. External feeds (Chainlink,
     Pyth) exist for ETH and may exist for tokenized stocks on Robinhood
     Chain, never for a coin; on-chain they are at most a sanity check on a
@@ -144,8 +144,8 @@ session notes):
     checks, with no on-chain dependency.
   - **The degen allowance (owner, 2026-11-04): buys of unlisted tokens,
     capped.** A just-launched coin is not on the token allowlist, and
-    listing one is a two-key change, so without this the Safe could never
-    ape a launch. The role may buy a token that is not on the allowlist,
+    listing one takes the home key and the cooldown, so without this the
+    Safe could never ape a launch in time. The role may buy a token that is not on the allowlist,
     through the guard, under a per-period allowance stated in stablecoin
     terms through the pricing path, provided the pool is quoted in a
     stablecoin or WETH and clears the absolute floor. This is the one
@@ -158,21 +158,58 @@ session notes):
     is prepared to lose with a wrench at their head. The time-weighted
     price is no defence here, the attacker set it, and neither is the
     Delay, which role calls bypass. Selling any token the Safe holds back
-    into a listed token is never capped, subject to the guard: de-risking
-    is not an exit. A young v3 pool has an oracle cardinality of one, so
+    into a listed token is never capped, subject to the guard, and needs
+    no listing, since the approver grants the guard its approval at sale
+    time: de-risking is not an exit. A young v3 pool has an oracle cardinality of one, so
     `observe` over the window reverts until it is grown and filled; the
     guard lets such a pool through on the absolute floor and the degen
     allowance alone, without the price check, and that is the degen path
     by construction. Launches on v2 pairs and on v4 are outside the guard
     and so outside the role.
-  - **The parameters are the policy's.** The deviation, the tick distance,
-    the depth multiple, the absolute floor, the pricing path and the degen
-    allowance are call parameters that Roles pins per pool to a maximum, a
-    minimum or a value, so changing them is a two-key policy change. The
-    guard is **stateless and unowned**: routers and position managers as
-    immutables, no admin, no upgrade, nothing to govern or compromise. The
-    token allowlist and the allowances stay in Roles, as conditions on the
-    guard's parameters.
+  - **The registry holds the policy the guard reads (option B, owner,
+    2026-11-05).** One contract per chain, owned by the Safe (two keys),
+    holding: the listed set; per pool, the deviation band, the tick
+    distance, the depth multiple, the absolute floor and the pricing path,
+    each with a default applied at listing; and two running per-period
+    notionals in stablecoin terms through the pricing path, one for the
+    listed path and one for the degen path, which the guard debits on
+    every swap and open. Listing a token needs no allowance entry: the
+    notionals are per path, not per token. The guard itself holds no funds
+    and has no admin: routers, position managers, the registry and the
+    approver as immutables, no upgrade; the registry is its state. A
+    reload cycle re-mints the same capital, so how the notional nets a
+    close against the next open is settled when the registry is written.
+  - **The listing Delay: the home key alone can add a token, after a
+    cooldown.** A Zodiac Delay modifier whose target is the registry and
+    whose only module is the home Ledger's EOA. It can queue one thing,
+    an add with the default parameters; after the cooldown (a day or two)
+    anyone executes it. Loosening a pool's parameters or raising a
+    notional is two-key, as is any other policy change: otherwise a
+    coercer would queue "list my token, multiple zero". Removing a token
+    is a role call, immediate, since narrowing is always safe. The Delay's
+    owner, who can skip a queued entry (`setTxNonce`), is **the vault
+    key**: there is no off-site key holder in this design, and a guardian
+    who can veto a listing alone is left open as an optional improvement.
+    So under a wrench attack a coerced listing does not fail by itself; it
+    costs the attacker the whole cooldown with the owner in hand while the
+    entry sits visible on chain, which is what the monitoring step
+    watches. After the cooldown the attacker's token is on the listed
+    path, where the band means nothing (their pool, their price) but the
+    absolute floor, the default depth multiple and the listed path's
+    per-period notional still hold; that notional is the second number
+    the owner sizes with a wrench in mind, after the degen allowance.
+  - **The approver: one module on the Safe, one function.** It makes the
+    Safe approve the guard for a token, any token, and nothing else; it
+    trusts the guard alone, and the guard invokes it only when the Safe is
+    its caller, right before a pull. An approval to the guard is spendable
+    only through the guard's own checks, and the guard delivers only to
+    the Safe, so the approver opens no exit; what it removes is the
+    per-token Roles scoping that would otherwise make every listing, and
+    every sale of a degen token, a two-key change. Standing approvals to
+    the guard accumulate for every token the Safe has traded, which puts
+    the guard squarely in the trust path: a bug in it could misroute what
+    it is approved to pull. That is why the audit covers the guard, the
+    registry and the approver together, before real funds.
   - **v3-shaped pools only, for now.** The reference price is v3's built-in
     `observe`. A v4 pool has no oracle of its own, only what a hook
     provides, and a hook also changes the swap math, so the guard's price
@@ -183,9 +220,10 @@ session notes):
     or a hook oracle listed pool by pool. It is taken when the engine's
     v3-versus-v4 measurement (portfolio-tools ADR-014, paper mode) shows
     that v4-only pairs matter.
-  - **Cost:** custom Solidity in the trust path, roughly two hundred lines,
-    so an audit before real funds, and the fork suite testing its reverts
-    as it tests the policy's. The time-weighted price is itself movable on
+  - **Cost:** custom Solidity in the trust path, the guard, the registry
+    and the approver together a few hundred lines, so an audit before real
+    funds, and the fork suite testing their reverts as it tests the
+    policy's. The time-weighted price is itself movable on
     a thin pool over several blocks, so the band is a cost imposed on a
     compromised engine, not a wall; with the depth floor that cost is what
     it takes to move a deep pool.
@@ -278,21 +316,19 @@ session notes):
   service account, every signature audit-logged. It is a role member on the
   trading Safe and an API wallet on Hyperliquid. By construction a full
   compromise of the app can only trade inside the allowlists; its residual,
-  bad trades, is bounded by the token allowlist, the allowances, the
-  guard's price and depth checks on-chain, and the engine's own risk
-  checks. Without the guard the residual was the whole book, at whatever
+  bad trades, is bounded by the registry's listed set and per-period
+  notionals, the guard's price and depth checks on-chain, and the engine's
+  own risk checks. Without the guard the residual was the whole book, at whatever
   price a flash swap could move a thin pool to, in one bundle (a swap with
   no trusted minimum output, or a single-sided open just beyond the moved
   price); with it, a bad trade costs the attacker what it takes to move a
-  deep pool's time-weighted price out of the band. One caveat on
-  allowances: an allowance on open amounts counts the same capital every
-  time a reload cycle re-mints it, so it is sized for churn or left to the
-  engine. Never a seed in the app.
+  deep pool's time-weighted price out of the band. Never a seed in the
+  app.
 
 ### Boundaries and rules
 
 - **This repository** holds the custody layer: the policies as code, the
-  guard contract, the apply and verify scripts, the fork test suite, the
+  guard, the registry and the approver, the apply and verify scripts, the fork test suite, the
   Safe deployment scripts, the Hyperliquid multi-sig tooling, the KMS
   signer service. The portfolio
   tracker keeps the execution engine and talks to this layer through a
@@ -327,7 +363,12 @@ session notes):
    through a hop under its floor reverts; a buy of an unlisted token
    passes under the degen allowance in a young pool over the floor, and
    reverts above the allowance, under the floor, or quoted in another
-   unlisted token), the close permission on the
+   unlisted token), the registry and the listing Delay (an add queued by
+   the home key executes after the cooldown and not before; the vault key
+   skips it; a home-key call that loosens a parameter or raises a notional
+   reverts; a removal by the role is immediate), the approver (refuses any
+   caller but the guard and any spender but the guard; a degen token
+   bought in one block is sold in the next), the close permission on the
    position manager (a partial fill decreased and collected to the Safe, a
    reload cycle as one MultiSend), the bridge permission, the Hyperliquid
    deposit transfer under its allowance, and the must-fail list, with a
@@ -348,25 +389,34 @@ session notes):
   Hyperliquid, moving anything out of the Safe, changing the policy (two
   owners in Safe{Wallet} or Rabby's Safe mode; under construction (b)
   above, queued through the Delay and executed after the cooldown).
-- **Changing the policy** (a new router or bridge on the allowlist, a
-  token, an allowance) is itself a non-role action: the Roles modifier's
-  configuration is owner-only and its owner is the trading Safe, so a
-  change is a Safe transaction by two owners (and, under (b), through the
-  cooldown). A role member cannot widen its own role — the point of the
-  design, and the reason allowlist changes are batched for the vault key's
-  visits.
+- **Changing the policy** is a non-role action with one exception.
+  Listing a token is the home key's alone, through the listing Delay and
+  its cooldown, with default parameters. Everything else (a new router or
+  bridge, a pool's parameters loosened, a notional raised, the Roles
+  configuration itself, whose owner is the Safe) is a Safe transaction by
+  two owners (and, under (b), through the cooldown). A role member cannot
+  widen its own role beyond that one delayed add — the point of the
+  design, and the reason the other changes are batched for the vault
+  key's visits.
 - Under a wrench attack the home key alone can trade within the allowlists
   and move money between the owner's own addresses, including the
   Hyperliquid deposit account up to its allowance. The one priced exit is
   the degen allowance: a coerced buy of the attacker's token in a pool the
-  attacker has funded past the absolute floor, capped per period. It
-  cannot send anything elsewhere.
-- Custom Solidity is the guard and nothing else: stateless, unowned,
-  audited, its reverts in the fork suite. A bug in it stops trading and
-  never moves funds, since it holds nothing and sends only to the Safe.
-  Custom policy is the other risk, and the same suite answers it.
-- Costs accepted: the Hyperliquid withdrawal needs both keys; the guard is
-  a contract to audit and a dependency of every trade; v4-only pools are
+  attacker has funded past the absolute floor, capped per period. A
+  coerced listing costs the attacker the cooldown with the owner in hand,
+  visible on chain, and then yields at most the listed path's per-period
+  notional in a pool that clears the floors. It cannot send anything
+  elsewhere.
+- Custom Solidity is the guard, the registry and the approver: holding no
+  funds, with no admin beyond the Safe, audited together, their reverts in
+  the fork suite. The guard is in the trust path through the approvals it
+  accumulates, so a bug in it could misroute what it is approved to pull;
+  the registry and the approver can at worst widen the listed set or an
+  approval to the guard, never move funds. Custom policy is the other
+  risk, and the same suite answers it.
+- Costs accepted: the Hyperliquid withdrawal needs both keys; three
+  contracts to audit and a dependency of every trade; a coerced listing is
+  delayed and visible, not refused; v4-only pools are
   outside the role until the guard has a reference price there; the engine's reload
   cycles are signed role calls, so the KMS key's gas balance and the
   signer's audit volume scale with how actively it trades; the Zodiac
