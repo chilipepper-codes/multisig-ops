@@ -118,12 +118,17 @@ the signer service. Agents never hold any key and never touch mainnet.
     two.** API wallets (the owner's browser agent, the app key) trade and
     cannot withdraw by Hyperliquid's own rules; the account is a native
     multi-sig with the home and vault keys at threshold 2, so the
-    withdrawal is Hyperliquid's multi-sig's, not the Safe's. Residual: a
-    Hyperliquid withdrawal can go to any destination, so the balance there
-    is kept at trading size. If the Safe becomes the account (story 13's
-    verification), the withdrawal becomes story 2's path instead and the
-    residual goes away: funds come back to the HyperEVM Safe with the home
-    key, and leaving the Safe system is story 2.
+    withdrawal is Hyperliquid's multi-sig's, not the Safe's, and the
+    account never touches HyperEVM (Hyperliquid's own rule for multi-sig
+    users). Residual: a Hyperliquid withdrawal can go to any destination,
+    so the balance there is kept at trading size. If the Safe becomes the
+    account (story 13's verification), the withdrawal becomes story 2's
+    path instead and that residual goes away: funds come back to the
+    HyperEVM Safe with the home key, and leaving the Safe system is story
+    2. The residual that replaces it: the account's funds then depend on
+    CoreWriter and on the HyperCore-to-HyperEVM USDC link rather than on
+    the Arbitrum bridge, with the balance kept at trading size either
+    way.
 
 ## Operations
 

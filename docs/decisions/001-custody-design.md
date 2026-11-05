@@ -363,6 +363,20 @@ session notes):
 - **The account is a fresh EOA**, converted to a **native multi-sig user**
   with the home and vault keys as authorized users, threshold 2. Everything
   the *account* does (withdraw, approve an agent, transfer) needs both keys.
+  Hyperliquid's own multi-sig page (read 2026-11-05) adds three rules that
+  bind this design: "CoreWriter does not work for multi-sig users";
+  "converting a user to a multi-sig still leaves the HyperEVM user
+  controllable by the original wallet"; and "in general, multi-sig users
+  should not interact with the HyperEVM before or after conversion". So
+  under this design the account never touches HyperEVM, and the
+  conversion back to a normal user, documented as possible, is reported
+  broken in the Python SDK's issue tracker (December 2025): treat it as
+  one-way. The June 2025 phishing campaign that converted some 1,200
+  accounts into attacker-controlled 1-of-1 multi-sigs with a single
+  signature is the other fact to carry: the conversion action is signed by
+  the account's own key, so an account that has a key can be taken over
+  that way, and a converted account's funds answer only to the new
+  signer set.
 - **Trading is by API wallets**, approved once by the multi-sig: the owner's
   browser agent and the app's KMS key. API wallets cannot withdraw by
   Hyperliquid's own rules.
@@ -457,17 +471,41 @@ session notes):
     requirement (a withdrawal can go anywhere, two keys). Custom code is
     zero in both; the Safe path wins on requirements, the EOA path on
     having nothing novel on HyperCore.
-  - **What testnet settles, and what could sink it:** CoreWriter actions
-    are fire-and-forget (the EVM transaction succeeds whether or not
-    HyperCore accepts the action, so the engine confirms by reading
-    HyperCore state through the precompiles, and a wrongly encoded action
-    is a silent no-op, not a revert); a unified account rejects spot send
-    and needs send asset; Roles' `Calldata` typing of the CoreWriter
-    payload, and the bitmask on CCTP hook data, proved on a fork; HYPE on
-    Core and on HyperEVM for gas; Circle's forwarder is an upgradeable
-    proxy Circle administers, the one party trusted beyond Hyperliquid
-    and Zodiac, and the same party already trusted for USDC itself.
-    Until the owner confirms, the native multi-sig design above stands.
+  - **Support and stranding, looked at squarely (2026-11-05).** The
+    Safe's HyperCore account is a *normal* user that happens to be a
+    contract address, acting through CoreWriter: the pattern Hyperliquid
+    built CoreWriter for and steers vault protocols to, and the one
+    Circle's forwarder, Across's handler and LI.FI's facet rely on in
+    production. It is **not** a native multi-sig user, and it must never
+    be converted into one: Hyperliquid's multi-sig page says CoreWriter
+    does not work for multi-sig users and that multi-sig users should not
+    interact with HyperEVM at all. The two designs are exclusive, and the
+    Safe path is the one without a key on HyperCore, so the 2025
+    conversion-phishing takeover has nothing to sign with. What the
+    account's funds depend on: CoreWriter accepting the Safe's actions,
+    and the USDC link between HyperCore and HyperEVM (the system address
+    and Circle's deposit wallet), since CoreWriter has no direct
+    withdrawal to Arbitrum. Both are Hyperliquid-operated mechanisms that
+    the whole HyperEVM ecosystem depends on, but they are the exposure,
+    where the native design's exposure is the Arbitrum bridge. The
+    accepted mitigation is the one already in force: the Hyperliquid
+    balance stays at trading size. Known failure modes to design the
+    engine around: CoreWriter actions are fire-and-forget (the EVM
+    transaction succeeds whether or not HyperCore accepts the action; a
+    wrongly encoded action, or one from an address with no HyperCore
+    account yet, is a silent no-op, not a revert), so the engine confirms
+    every action by reading HyperCore state through the precompiles and
+    treats "not landed" as retryable, never as lost; an open report on
+    the node tracker (September 2026, testnet, unresolved) of CoreWriter
+    actions that succeeded on the EVM and did nothing on Core, which the
+    testnet soak must reproduce or rule out before any mainnet step;
+    unified-account mode rejects spot send, so the policy uses send
+    asset; HYPE is needed on Core and on HyperEVM for gas. Also to prove
+    on a fork: Roles' `Calldata` typing of the CoreWriter payload and the
+    bitmask on CCTP hook data. Circle's forwarder is an upgradeable proxy
+    Circle administers, the one party trusted beyond Hyperliquid and
+    Zodiac, and the same party already trusted for USDC itself. Until the
+    owner confirms, the native multi-sig design above stands.
 
 ### The app's key
 
