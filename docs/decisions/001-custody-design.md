@@ -77,14 +77,14 @@ session notes):
 - **One role, "trader", two members:** the home Ledger's EOA and the app's
   KMS key. What the role allows, and nothing else: calls to the guard
   (swaps and range-order opens, on the listed path or the degen path as
-  the registry says; the guard delivers everything to the Safe, next
-  bullets); ERC-20 approvals on listed tokens to a listed bridge or
-  Permit2 (approvals to the guard are the approver module's, below, and
-  need no role call); closing a range position on the position manager
-  with the proceeds pinned to the Safe; bridges whose destination is the
-  Safe's address on the other chain; removing a token from the registry;
-  one transfer target outside the Safe, the Hyperliquid deposit account
-  below, under an allowance. The token set, the per-pool parameters and
+  the registry says, and bridges of any held token to the Safe's own
+  address on the other chain; the guard delivers everything to the Safe,
+  next bullets; its approvals are the approver module's and need no role
+  call); closing a range position on the position manager with the
+  proceeds pinned to the Safe; removing a token from the registry; one
+  transfer target outside the Safe, the Hyperliquid deposit account
+  below, under an allowance (a `transfer` on the stablecoin, a fixed
+  target, so it stays a Roles condition). The token set, the per-pool parameters and
   the per-period notionals are the registry's, not Roles conditions
   (amended 2026-11-05: Roles scopes calls per target address and cannot
   scope "approve on any token", so a token set in Roles would make every
@@ -99,7 +99,13 @@ session notes):
   bundle. The guard derives the bounds on-chain instead of trusting the
   caller's parameters:
   - **The reference price** is the pool's time-weighted price (`observe`),
-    never `slot0`, which is what the attacker moves.
+    never `slot0`, which is what the attacker moves. Sales get a wider
+    band and a shorter window than buys, by parameter: a sale at spot in a
+    deep pool during a crash sits far below the time-weighted price and is
+    the market, not an attack, and the owner must be able to sell into a
+    crash with the home key alone. The depth multiple scales with the band
+    (below), so the wider band costs an attacker proportionally more depth
+    to abuse.
   - **A swap** pulls the input from its caller, the Safe, computes the
     minimum output
     from the reference price less a maximum deviation, calls the listed
@@ -108,6 +114,12 @@ session notes):
     correct side of the reference price and within a few tick spacings of
     it, with the minimum equal to the amount offered (a range the price has
     already entered reverts), the NFT to the Safe.
+  - **A bridge** (2026-11-05) pulls any held token, listed or not, and
+    calls a listed bridge with the destination pinned to the Safe's own
+    address on the other chain; no price check and no cap, since the
+    destination is the owner's. It is in the guard because a bridge needs
+    an approval on the token, which Roles cannot scope for a token it does
+    not list; the approver grants it.
   - **A depth floor relative to the trade, per pool, for listed pools.**
     The floor is what makes the reference price worth trusting: moving a
     time-weighted price by the band must cost more than it gains. On a pool
@@ -158,23 +170,38 @@ session notes):
     is prepared to lose with a wrench at their head. The time-weighted
     price is no defence here, the attacker set it, and neither is the
     Delay, which role calls bypass. Selling any token the Safe holds back
-    into a listed token is never capped, subject to the guard, and needs
-    no listing, since the approver grants the guard its approval at sale
-    time: de-risking is not an exit. A young v3 pool has an oracle cardinality of one, so
-    `observe` over the window reverts until it is grown and filled; the
-    guard lets such a pool through on the absolute floor and the degen
-    allowance alone, without the price check, and that is the degen path
-    by construction. Launches on v2 pairs and on v4 are outside the guard
-    and so outside the role.
+    into the reserve set is never capped and needs no listing, since the
+    approver grants the guard its approval at sale time. A token bought
+    under the degen allowance stays on the degen path, re-buys included,
+    until it is listed: listing on first buy would hand a thief an
+    uncapped path for a dollar of their own coin. A young v3 pool has an
+    oracle cardinality of one, so `observe` over the window reverts until
+    it is grown and filled; the guard lets a buy in such a pool through on
+    the absolute floor and the degen allowance alone, without the price
+    check, and that is the degen path by construction. The engine grows
+    the pool's cardinality in the same batch as its first buy, so the
+    window without a reference price is short, and a **sale** is
+    band-checked wherever a time-weighted price exists: the only holdings
+    a thief could dump at a bad price into a pool of their own are the
+    ones just bought, which the allowance already bounds. **Probation:** a
+    token listed from the home key keeps counting against the degen
+    allowance for its first N days (N a two-key parameter, a week or a
+    month), and takes the listed path's parameters and notional after.
+    Without it a stolen home key would list its coin after a day and buy
+    it on the listed path. Launches on v2 pairs and on v4 are outside the
+    guard and so outside the role.
   - **The registry holds the policy the guard reads (option B, owner,
     2026-11-05).** One contract per chain, owned by the Safe (two keys),
     holding: the listed set; per pool, the deviation band, the tick
     distance, the depth multiple, the absolute floor and the pricing path,
     each with a default applied at listing; and two running per-period
     notionals in stablecoin terms through the pricing path, one for the
-    listed path and one for the degen path, which the guard debits on
-    every swap and open. Listing a token needs no allowance entry: the
-    notionals are per path, not per token. The guard itself holds no funds
+    listed path and one for the degen path, which the guard debits with
+    the value of what is **bought** on every swap and open. Buys of the
+    reserve set (the stablecoins and WETH, a two-key list) count for
+    nothing, so a sale of any token into them is never capped: de-risking
+    is not an exit. Listing a token needs no allowance entry: the notionals
+    are per path, not per token. The guard itself holds no funds
     and has no admin: routers, position managers, the registry and the
     approver as immutables, no upgrade; the registry is its state. A
     reload cycle re-mints the same capital, so how the notional nets a
@@ -404,9 +431,16 @@ session notes):
   the degen allowance: a coerced buy of the attacker's token in a pool the
   attacker has funded past the absolute floor, capped per period. A
   coerced listing costs the attacker the cooldown with the owner in hand,
-  visible on chain, and then yields at most the listed path's per-period
-  notional in a pool that clears the floors. It cannot send anything
-  elsewhere.
+  visible on chain, and then, for the probation, still only the degen
+  allowance; after it, at most the listed path's per-period notional in a
+  pool that clears the floors. It cannot send anything elsewhere.
+- **A stolen home key**, with no owner to coerce, takes the degen
+  allowance per day and nothing else, listing or not, for as long as the
+  probation runs; the residuals are the Hyperliquid deposit allowance if
+  that account's key is kept with the home key, and a dump of just-bought
+  degen holdings into a pool of the thief's own, which the allowance
+  already bounds. The vault key skips any listing the thief queued, which
+  is what the monitoring step is for.
 - Custom Solidity is the guard, the registry and the approver: holding no
   funds, with no admin beyond the Safe, audited together, their reverts in
   the fork suite. The guard is in the trust path through the approvals it

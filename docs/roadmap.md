@@ -35,11 +35,11 @@ any policy goes live; agents never hold a key, never touch mainnet.
    registry (the listed set, per-pool parameters with defaults, the two
    per-period notionals) and the approver, with their fork tests; the
    listing Delay in front of the registry; and the policies for Base,
-   Arbitrum, Ethereum and Robinhood Chain: the guard's functions for the
-   trader role, approvals on listed tokens to a bridge or Permit2, the
-   position manager's close functions with the proceeds pinned to the
-   Safe, the registry's remove, the native bridge, the Hyperliquid deposit
-   transfer under its allowance, and the must-fail list (ADR-001); the
+   Arbitrum, Ethereum and Robinhood Chain: the guard's functions (swap,
+   open, bridge) for the trader role, the position manager's close
+   functions with the proceeds pinned to the Safe, the registry's remove,
+   the Hyperliquid deposit transfer under its allowance, and the must-fail
+   list (ADR-001); the
    apply and verify scripts that read the modifier's events (no subgraph
    on Robinhood Chain).
 3. **Same-address Safes by script**, the Delay cooldowns (the owner path
