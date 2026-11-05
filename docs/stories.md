@@ -82,12 +82,10 @@ the signer service. Agents never hold any key and never touch mainnet.
 
 10. **An attacker with the home key can take out the degen allowance once
     per day and nothing else.** The role path has no exit: every swap,
-    open and bridge delivers to the Safe, approvals go only to the guard,
-    and the one transfer out goes to the Hyperliquid deposit address under
-    its allowance. Residuals, each accepted: story 9's listing attack
-    after three days; story 4's sandwich on sales; the Hyperliquid deposit
-    allowance if that account's key is kept with the home key. Story 11
-    ends all of them once noticed.
+    open, bridge and Hyperliquid transfer delivers to the Safe's own
+    address, and approvals go only to the guard. Residuals, each
+    accepted: story 9's listing attack after three days; story 4's
+    sandwich on sales. Story 11 ends both once noticed.
 11. **I can halt all trading at once with the home key; resuming needs two
     keys plus the delay.** The registry's pause flag, set by any role
     member, cleared through story 2's path. The guard refuses every call
@@ -98,37 +96,32 @@ the signer service. Agents never hold any key and never touch mainnet.
 
 ## Hyperliquid
 
-13. **I can deposit to Hyperliquid with the home key, up to an allowance
-    per period.** Hyperliquid credits a deposit to the address that sent
-    it, and that address must sign Hyperliquid's own messages, which a
-    Safe cannot; so the Safe transfers USDC to the trading account's own
-    Arbitrum address (the one transfer out the role allows, capped), and
-    that address sends it to the bridge. The cap is the typical deposit
-    size, because that address is an ordinary account whose key is kept
-    at home. Residual: one period's deposits, story 10. **Recommended,
-    to confirm on testnet:** the Safe itself as the Hyperliquid account,
-    through a same-address Safe on HyperEVM whose Roles scope CoreWriter
-    directly (the whole Zodiac stack is deployed there; no custom code),
-    fed by CCTP with the recipient pinned in the signed calldata: no hop,
-    no allowance, and the withdrawal back to the wallet a home-key action
-    (ADR-001, Hyperliquid). The same rail with the recipient pinned to
-    the native multi-sig account removes the hop and the allowance even
-    if the Safe path is not taken.
-14. **Trading on Hyperliquid needs no owner key; withdrawing from it needs
-    two.** API wallets (the owner's browser agent, the app key) trade and
-    cannot withdraw by Hyperliquid's own rules; the account is a native
-    multi-sig with the home and vault keys at threshold 2, so the
-    withdrawal is Hyperliquid's multi-sig's, not the Safe's, and the
-    account never touches HyperEVM (Hyperliquid's own rule for multi-sig
-    users). Residual: a Hyperliquid withdrawal can go to any destination,
-    so the balance there is kept at trading size. If the Safe becomes the
-    account (story 13's verification), the withdrawal becomes story 2's
-    path instead and that residual goes away: funds come back to the
-    HyperEVM Safe with the home key, and leaving the Safe system is story
-    2. The residual that replaces it: the account's funds then depend on
-    CoreWriter and on the HyperCore-to-HyperEVM USDC link rather than on
-    the Arbitrum bridge, with the balance kept at trading size either
-    way.
+13. **I can deposit to Hyperliquid with the home key, with no hop and no
+    cap.** The Safe itself is the Hyperliquid account: the same Safe at
+    the same address on HyperEVM, where the whole Zodiac stack is
+    deployed, controls its HyperCore account through CoreWriter, scoped
+    by Roles with no custom code. A deposit is a CCTP burn from the
+    Arbitrum Safe with the recipient pinned to the Safe in the signed
+    calldata (or a native-bridge deposit, credited to the sender), so it
+    is a transfer between the owner's own addresses. Decided 2026-11-05,
+    validated thoroughly on testnet before any live funds (ADR-001,
+    Hyperliquid). Residual: none on the deposit itself; story 14 carries
+    the account's exposure.
+14. **Trading on Hyperliquid needs no owner key; withdrawing back to my
+    wallet needs the home key alone; leaving the Safe system needs two
+    keys plus the delay.** API wallets (the owner's browser agent, the
+    app key), approved through CoreWriter by two keys, trade and cannot
+    withdraw by Hyperliquid's own rules. A withdrawal back to the wallet
+    is a class transfer, a send asset to the USDC system address and a
+    CCTP burn pinned to the Arbitrum Safe, all role calls between the
+    owner's own addresses; after that, story 2. The account is never
+    converted into a native multi-sig (Hyperliquid's rule: CoreWriter
+    does not work for multi-sig users), and it has no key for the 2025
+    conversion phishing to sign with. Residual: the account's funds depend
+    on CoreWriter and on the HyperCore-to-HyperEVM USDC link, both
+    Hyperliquid-operated, so the balance there is kept at trading size;
+    CoreWriter actions are fire-and-forget, so the engine confirms each
+    one through the precompiles and treats "not landed" as retryable.
 
 ## Operations
 

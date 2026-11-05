@@ -1,7 +1,8 @@
 # multisig-ops
 
 The custody layer for a trading book: policies as code for Safe + Zodiac Roles
-on EVM chains, the Hyperliquid native multi-sig tooling, the hardware-held key
+on EVM chains and on HyperEVM, where the same Safe is the Hyperliquid
+account through CoreWriter, the hardware-held key
 the portfolio tracker's execution engine trades with, and the fork test suite
 that proves what each policy allows and refuses.
 
@@ -37,6 +38,6 @@ order and what is queued without a decision (Solana).
   policies'.
 - `scripts/` — Safe deployment at the same address per chain, policy apply
   and verify (reads the modifier's own events; no subgraph needed), the
-  Hyperliquid multi-sig actions.
+  Hyperliquid account's CoreWriter policy and its testnet checks.
 - `signer/` — the KMS signer service the execution engine calls.
 - `test/` — the fork suite.

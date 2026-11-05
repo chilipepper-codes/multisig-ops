@@ -1,4 +1,4 @@
-# ADR-001: Wrench-resistant self-custody for a trading book — Safe + Roles on EVM, native multi-sig on Hyperliquid, a hardware key for the app
+# ADR-001: Wrench-resistant self-custody for a trading book — Safe + Roles on EVM and on HyperEVM as the Hyperliquid account, a hardware key for the app
 
 **Status:** accepted as the design (owner, 2026-10-24); amended 2026-11-02 to
 scope CLMM range orders into the trader role; amended 2026-11-04 (owner):
@@ -9,8 +9,9 @@ and the approver module; amended again 2026-11-05 after the owner's user
 stories (`docs/stories.md`, the spec this design is measured against):
 three owner keys, 3 of 3 direct and 2 of 3 through the Delay, a wide
 band on sales, the listing attack accepted at a three-day cooldown, a
-pause flag, the Safe as the Hyperliquid account to verify; nothing built
-yet. Solana is
+pause flag; decided 2026-11-05 (owner): the Safe is the Hyperliquid
+account, validated on testnet before live funds, the native multi-sig out;
+nothing built yet. Solana is
 **proposed**, not decided (last section). Every "verify" line below is a
 testnet or fork step that precedes real funds.
 
@@ -51,7 +52,13 @@ session notes):
   withdrawals or transfers). Its native multi-sig applies the threshold to
   **every** action of the account, trading included. Deposits are credited to
   the sending address, which must be able to sign Hyperliquid's EIP-712
-  actions (ecrecover; a Safe cannot).
+  actions (ecrecover; a Safe cannot). Amended 2026-11-05: since 2025
+  HyperEVM's CoreWriter system contract lets a contract act for its own
+  address on HyperCore, so a Safe at the same address on HyperEVM holds and
+  controls that account; the Zodiac stack, Safe 1.4.1 and CoreWriter have
+  bytecode on HyperEVM at their canonical addresses (read from the chain).
+  Hyperliquid's own docs: CoreWriter does not work for native multi-sig
+  users, and multi-sig users should not interact with HyperEVM.
 - Uniswap v2, v3, v4 and UniswapX are live on Robinhood Chain; the v3
   SwapRouter02 takes the recipient as a plain struct field; the Universal
   Router (v4) takes nested command bytes. The canonical Universal Router
@@ -89,10 +96,11 @@ session notes):
   address on the other chain; the guard delivers everything to the Safe,
   next bullets; its approvals are the approver module's and need no role
   call); closing a range position on the position manager with the
-  proceeds pinned to the Safe; removing a token from the registry; one
-  transfer target outside the Safe, the Hyperliquid deposit account
-  below, under an allowance (a `transfer` on the stablecoin, a fixed
-  target, so it stays a Roles condition). The token set, the per-pool parameters and
+  proceeds pinned to the Safe; removing a token from the registry; on
+  HyperEVM, the CoreWriter actions the Hyperliquid section lists, scoped
+  as calldata. Nothing the role allows sends funds to an address that is
+  not the Safe's own (amended 2026-11-05: the Hyperliquid deposit hop, the
+  one such transfer, is gone with the native multi-sig). The token set, the per-pool parameters and
   the per-period notionals are the registry's, not Roles conditions
   (amended 2026-11-05: Roles scopes calls per target address and cannot
   scope "approve on any token", so a token set in Roles would make every
@@ -358,154 +366,110 @@ session notes):
   replayed per chain), until Safe{Wallet}'s multi-chain deployment covers
   Robinhood Chain.
 
-### Hyperliquid
+### Hyperliquid (decided 2026-11-05: the Safe is the account)
 
-- **The account is a fresh EOA**, converted to a **native multi-sig user**
-  with the home and vault keys as authorized users, threshold 2. Everything
-  the *account* does (withdraw, approve an agent, transfer) needs both keys.
-  Hyperliquid's own multi-sig page (read 2026-11-05) adds three rules that
-  bind this design: "CoreWriter does not work for multi-sig users";
-  "converting a user to a multi-sig still leaves the HyperEVM user
-  controllable by the original wallet"; and "in general, multi-sig users
-  should not interact with the HyperEVM before or after conversion". So
-  under this design the account never touches HyperEVM, and the
-  conversion back to a normal user, documented as possible, is reported
-  broken in the Python SDK's issue tracker (December 2025): treat it as
-  one-way. The June 2025 phishing campaign that converted some 1,200
-  accounts into attacker-controlled 1-of-1 multi-sigs with a single
-  signature is the other fact to carry: the conversion action is signed by
-  the account's own key, so an account that has a key can be taken over
-  that way, and a converted account's funds answer only to the new
-  signer set.
-- **Trading is by API wallets**, approved once by the multi-sig: the owner's
-  browser agent and the app's KMS key. API wallets cannot withdraw by
-  Hyperliquid's own rules.
-- **Deposits have a hop, which is why they are capped.** Hyperliquid
-  credits a deposit to the address that sent it, and that address must be
-  able to sign Hyperliquid's own messages, which a Safe cannot. So the
-  Safe first transfers USDC to the trading account's own address on
-  Arbitrum (the one transfer out of the Safe to a non-Safe address the
-  role allows), and that address sends it into the bridge. That address
-  is an ordinary account whose key is kept at home, and whoever holds that
-  key can send whatever reaches it anywhere; the per-period allowance on
-  the transfer is sized to the typical deposit, nothing more, so a stolen
-  home key takes at most one period's deposits by this route.
-- **Withdrawing from Hyperliquid is a two-key action**, handled by
-  Hyperliquid's own multi-sig, not the Safe. This is the one requirement
-  the design does not meet: whoever can withdraw on Hyperliquid can choose
-  any destination, and the multi-sig threshold is the only lever.
-  Accepted: the Hyperliquid balance is kept at trading size, and
-  withdrawals are planned. The alternative, the account on the home key,
-  leaves the whole balance wrench-exposed.
-- **Recommended, to confirm on testnet (2026-11-05): the Safe itself as
-  the Hyperliquid account, with no custom code on the Hyperliquid side.**
-  The owner asked whether a bridge aggregator could deposit without the
-  hop, and whether the Safe route could be done with less custom code
-  than a product nobody ships. Researched the same day, with the chain's
-  own answers where the docs were out of reach:
-  - **The whole Zodiac stack is on HyperEVM.** Read from HyperEVM's RPC
-    (chain 999): the Roles 2.1.1 mastercopy, the Delay 1.1.1 mastercopy,
-    the module proxy factory, the MultiSend unwrapper, the Safe 1.4.1
-    singleton and its proxy factory all have bytecode at their canonical
-    addresses, as does CoreWriter at `0x3333…3333`. The official Roles v2
-    deployments list names HyperEVM. So a Safe at the owner's address on
-    HyperEVM, with the same Roles and Delay as everywhere, is a deployment
-    of audited canonical contracts, nothing new.
-  - **Roles can scope CoreWriter without a contract in between.**
-    CoreWriter has one function, `sendRawAction(bytes)`, and the payload
-    is one version byte, a three-byte action id, then the ABI-encoded
-    parameters: the shape of a function call with a four-byte selector,
-    which is exactly Roles' `Calldata` parameter type. So the trader role
-    scopes the bytes as it would a call: USD class transfer (action 7) in
-    either direction; send asset (action 13) with the destination pinned
-    to the USDC system address, the token pinned to USDC and the
-    sub-account to zero; orders and cancels if the owner wants the Safe
-    itself to trade. Add API wallet (action 9) and anything else is
-    two-key through the Delay. The Hyperliquid side therefore needs no
-    guard, no registry, no custom Solidity: policy only, proved by the
-    fork suite like the rest. The `hyper-evm-lib` library (hyperliquid-dev)
-    encodes every action and ships a local simulator for Foundry, which is
-    what the fork tests use.
-  - **Funds keep the Safe's address in both directions.** A send asset to
-    the USDC system address pays out by an ERC-20 transfer to the sender's
-    own HyperEVM address (Hyperliquid's docs), that is the Safe; an ERC-20
-    transfer from the HyperEVM Safe to the system address is credited to
-    the Safe's Core account. A deposit from Arbitrum into the native
-    bridge is credited to the sender, the Safe. The account must exist on
-    Core before an action, which the first deposit creates (a 1 USDC
-    activation), and it must hold a little HYPE on Core to pay for send
-    asset.
-  - **Deposit rails, best first, all with the destination in the signed
-    calldata:** (1) **CCTP v2 with Circle's forwarder**: one transaction
-    from the Arbitrum Safe, `depositForBurnWithHook` with the mint
-    recipient and destination caller pinned to Circle's forwarder on
-    HyperEVM and the HyperCore recipient in the hook data (bytes 32 to
-    52, pinned by Roles' bitmask), which the forwarder deposits for that
-    recipient into perp or spot; Circle's canonical contracts end to end,
-    no aggregator, no solver, and it works for any recipient, the Safe or
-    an EOA. (2) **Plain CCTP to the HyperEVM Safe**, then the Safe's own
-    deposit for itself through Circle's `CoreDepositWallet.depositFor`
-    (a role call with the recipient pinned to the Safe): two transactions,
-    same trust. (3) **The native bridge from Arbitrum**, credited to the
-    sender: pinned by construction, only ever to the Safe's own account.
-    (4) **Aggregators** (Across's `HyperliquidDepositHandler`, LI.FI's
-    Polymer CCTP facet, deBridge's orders): the recipient is in the
-    calldata too, validated by their contracts, but their contracts and
-    relayers join the trust path; LI.FI's facet is itself the CCTP route
-    above with LI.FI in front, so there is nothing to gain over calling
-    Circle directly. The owner's reading of aggregators was right in
-    substance: an intent solver pays the recipient on HyperCore from its
-    own balance while the source funds go to the relayer; the difference
-    between them is whether the recipient is in the transaction the Safe
-    signs (deBridge, Across, LI.FI: yes) or only in the quote (Relay: no).
-  - **Withdrawals back to the wallet become a home-key action**, which the
-    native multi-sig design never met: class transfer to spot, send asset
-    to the system address, CCTP burn from the HyperEVM Safe with the mint
-    recipient pinned to the Arbitrum Safe. All transfers between the
-    owner's own addresses, all role calls. Leaving the Safe system stays
-    the two-key delayed path as everywhere.
-  - **The alternative with the same deposit rails is the native multi-sig
-    EOA as the account**, fed by rail (1) with the recipient pinned to
-    that EOA: no hop, no home-kept Arbitrum key, no allowance, and no
-    CoreWriter at all. It keeps the multi-sig conversion and the unmet
-    requirement (a withdrawal can go anywhere, two keys). Custom code is
-    zero in both; the Safe path wins on requirements, the EOA path on
-    having nothing novel on HyperCore.
-  - **Support and stranding, looked at squarely (2026-11-05).** The
-    Safe's HyperCore account is a *normal* user that happens to be a
-    contract address, acting through CoreWriter: the pattern Hyperliquid
-    built CoreWriter for and steers vault protocols to, and the one
-    Circle's forwarder, Across's handler and LI.FI's facet rely on in
-    production. It is **not** a native multi-sig user, and it must never
-    be converted into one: Hyperliquid's multi-sig page says CoreWriter
-    does not work for multi-sig users and that multi-sig users should not
-    interact with HyperEVM at all. The two designs are exclusive, and the
-    Safe path is the one without a key on HyperCore, so the 2025
-    conversion-phishing takeover has nothing to sign with. What the
-    account's funds depend on: CoreWriter accepting the Safe's actions,
-    and the USDC link between HyperCore and HyperEVM (the system address
-    and Circle's deposit wallet), since CoreWriter has no direct
-    withdrawal to Arbitrum. Both are Hyperliquid-operated mechanisms that
-    the whole HyperEVM ecosystem depends on, but they are the exposure,
-    where the native design's exposure is the Arbitrum bridge. The
-    accepted mitigation is the one already in force: the Hyperliquid
-    balance stays at trading size. Known failure modes to design the
-    engine around: CoreWriter actions are fire-and-forget (the EVM
-    transaction succeeds whether or not HyperCore accepts the action; a
-    wrongly encoded action, or one from an address with no HyperCore
-    account yet, is a silent no-op, not a revert), so the engine confirms
-    every action by reading HyperCore state through the precompiles and
-    treats "not landed" as retryable, never as lost; an open report on
-    the node tracker (September 2026, testnet, unresolved) of CoreWriter
-    actions that succeeded on the EVM and did nothing on Core, which the
-    testnet soak must reproduce or rule out before any mainnet step;
-    unified-account mode rejects spot send, so the policy uses send
-    asset; HYPE is needed on Core and on HyperEVM for gas. Also to prove
-    on a fork: Roles' `Calldata` typing of the CoreWriter payload and the
-    bitmask on CCTP hook data. Circle's forwarder is an upgradeable proxy
-    Circle administers, the one party trusted beyond Hyperliquid and
-    Zodiac, and the same party already trusted for USDC itself. Until the
-    owner confirms, the native multi-sig design above stands.
+- **The account is the Safe.** The same Safe, at the same address, deployed
+  on HyperEVM with the same Roles and Delay as on every other chain: the
+  Roles 2.1.1 and Delay 1.1.1 mastercopies, the module proxy factory, the
+  MultiSend unwrapper, the Safe 1.4.1 singleton and its factory all have
+  bytecode on HyperEVM at their canonical addresses, as does CoreWriter at
+  `0x3333…3333` (read from the chain's RPC, 2026-11-05; the official
+  Roles v2 deployments list names HyperEVM). Its HyperCore account is a
+  normal user that happens to be a contract address, created by its first
+  deposit (a 1 USDC activation), holding a little HYPE on Core for
+  transfers and on HyperEVM for gas. It is **never converted into a native
+  multi-sig user**: Hyperliquid's own multi-sig page says CoreWriter does
+  not work for multi-sig users and that multi-sig users should not
+  interact with HyperEVM at all. And it has no key on HyperCore, so the
+  June 2025 phishing campaign that converted some 1,200 accounts into
+  attacker-controlled 1-of-1 multi-sigs with one signature has nothing to
+  sign with here. The owner's condition: validated thoroughly on testnet
+  before any live funds (build step 4).
+- **Control is CoreWriter, scoped by Roles, with no custom code.**
+  CoreWriter has one function, `sendRawAction(bytes)`, and the payload is
+  one version byte, a three-byte action id, then the ABI-encoded
+  parameters: the shape of a function call with a four-byte selector,
+  which is Roles' `Calldata` parameter type. So the trader role scopes
+  the bytes as it would a call: USD class transfer (action 7) in either
+  direction; send asset (action 13) with the destination pinned to the
+  USDC system address, the token pinned to USDC and the sub-account to
+  zero; orders and cancels (1, 10, 11) if the owner wants the Safe itself
+  to trade. Add API wallet (action 9), set abstraction (16) and anything
+  else is two-key through the Delay. The Hyperliquid side therefore needs
+  no guard, no registry, no custom Solidity: policy only, proved by the
+  fork suite like the rest. The `hyper-evm-lib` library (hyperliquid-dev)
+  encodes every action and ships a local simulator for Foundry, which is
+  what the fork tests use. CoreWriter actions are attributed to the
+  calling contract, the Safe; the Zodiac module path leaves the Safe as
+  the caller.
+- **Trading is by API wallets**, approved through CoreWriter by two keys:
+  the owner's browser agent and the app's KMS key. API wallets cannot
+  withdraw by Hyperliquid's own rules; the engine signs orders with the
+  KMS key off-chain exactly as before.
+- **Deposits are role calls with the destination in the signed calldata**,
+  never a transfer to an address that is not the Safe's own. Best first:
+  (1) **CCTP v2 with Circle's forwarder**: one transaction from the
+  Arbitrum Safe, `depositForBurnWithHook` with the mint recipient and
+  destination caller pinned to Circle's forwarder on HyperEVM and the
+  HyperCore recipient, the Safe, in the hook data (bytes 32 to 52, pinned
+  by Roles' bitmask), which the forwarder deposits for the Safe into perp
+  or spot; Circle's canonical contracts end to end, no aggregator, no
+  solver. (2) **Plain CCTP to the HyperEVM Safe**, then the Safe's own
+  deposit for itself through Circle's `CoreDepositWallet.depositFor` with
+  the recipient pinned to the Safe: two transactions, same trust. (3)
+  **The native bridge from Arbitrum**, credited to the sender: pinned by
+  construction. From other chains, first to the Arbitrum Safe over a
+  bridge with the destination pinned, then (1). Aggregators (Across's
+  `HyperliquidDepositHandler`, LI.FI's Polymer CCTP facet, deBridge's
+  orders) also carry the recipient in calldata, but their contracts and
+  relayers join the trust path for nothing (LI.FI's facet is route (1)
+  with LI.FI in front); a bridge whose recipient lives only in an
+  off-chain quote (Relay) cannot be pinned and is not a role call.
+- **Withdrawals back to the wallet are a home-key action**, requirement 2
+  met for Hyperliquid, which the native multi-sig never could: a USD
+  class transfer to spot, a send asset to the USDC system address (paid
+  out by an ERC-20 transfer to the sender's own HyperEVM address, the
+  Safe), and a CCTP burn from the HyperEVM Safe with the mint recipient
+  pinned to the Arbitrum Safe. All transfers between the owner's own
+  addresses, all role calls. Leaving the Safe system stays the two-key
+  delayed path as everywhere.
+- **Exposure and failure modes, stated squarely.** The account's funds
+  depend on CoreWriter accepting the Safe's actions and on the USDC link
+  between HyperCore and HyperEVM (the system address and Circle's deposit
+  wallet), since CoreWriter has no direct withdrawal to Arbitrum. Both are
+  Hyperliquid-operated mechanisms that the whole HyperEVM ecosystem
+  depends on (Hyperliquid steers vault protocols to exactly this pattern;
+  Circle's forwarder, Across's handler and LI.FI's facet run on it in
+  production), but they are the exposure, where the native design's was
+  the Arbitrum bridge; the mitigation is the one already in force, a
+  Hyperliquid balance kept at trading size. The engine is designed around
+  the known failure modes: CoreWriter actions are fire-and-forget (the
+  EVM transaction succeeds whether or not HyperCore accepts the action; a
+  wrongly encoded action, or one from an address with no HyperCore
+  account yet, is a silent no-op, not a revert), so every action is
+  confirmed by reading HyperCore state through the precompiles and "not
+  landed" is retryable, never lost; an open report on the node tracker
+  (September 2026, testnet, unresolved) of actions that succeeded on the
+  EVM and did nothing on Core is what the testnet soak reproduces or rules
+  out before any mainnet step; unified-account mode rejects spot send, so
+  the policy uses send asset; order actions from CoreWriter land a few
+  seconds after the EVM block. To prove on a fork: Roles' `Calldata`
+  typing of the CoreWriter payload and the bitmask on CCTP hook data.
+  Circle's forwarder is an upgradeable proxy Circle administers, the one
+  party trusted beyond Hyperliquid and Zodiac, and the same party already
+  trusted for USDC itself.
+- **Rejected (2026-11-05): the native multi-sig account.** A fresh EOA
+  converted to a native multi-sig user with the home and vault keys at
+  threshold 2 was the design until this amendment. It needed a deposit
+  hop through that EOA's own Arbitrum address, whose key sat at home, and
+  so a per-period allowance on the one transfer out of the Safe; its
+  withdrawal could go to any destination and needed both keys, the one
+  requirement the design did not meet; conversion is one-way in practice
+  (the documented conversion back is reported broken in the Python SDK's
+  tracker, December 2025); the account has a key, which is what the 2025
+  conversion phishing signs with; and Hyperliquid's own rules keep a
+  multi-sig user off HyperEVM, so it could never have used CoreWriter.
+  The Safe account has none of these and the same zero custom code.
 
 ### The app's key
 
@@ -551,10 +515,19 @@ session notes):
 
 ### Verify before real funds
 
-1. Hyperliquid testnet: the multi-sig conversion (one report says converting
-   back failed, treat it as one-way); approving an agent through a
-   multi-sig-wrapped action; trading through that agent from the app and from
-   the web UI; a withdrawal refusing one signature.
+1. Hyperliquid testnet, the Safe as the account: the same-address Safe,
+   Roles and Delay deployed on HyperEVM testnet; a CCTP deposit from the
+   Arbitrum testnet Safe with the recipient pinned in the hook data,
+   credited to the Safe's HyperCore account (and a native-bridge deposit,
+   credited to the sender); an API wallet approved through CoreWriter by
+   two keys, then trading through it from the app and from the web UI; a
+   class transfer and a send asset to the system address as role calls,
+   the USDC landing on the HyperEVM Safe, and a pinned CCTP burn back to
+   the Arbitrum Safe; every CoreWriter action confirmed through the
+   precompiles, with the silent-failure report on the node tracker
+   reproduced or ruled out; a send asset to any other destination, and an
+   add API wallet by the role, refused by Roles; a soak of weeks before any
+   live funds (owner's condition).
 2. A fork of Robinhood Chain: the guard (a swap within the band passes and
    delivers to the Safe; a swap after a flash move of the spot reverts; a
    single-sided open to the Safe; an open against a moved spot reverts; a
@@ -572,8 +545,8 @@ session notes):
    role call, the guard refuses everything; cleared only through the
    Delay), the close permission on the
    position manager (a partial fill decreased and collected to the Safe, a
-   reload cycle as one MultiSend), the bridge permission, the Hyperliquid
-   deposit transfer under its allowance, and the must-fail list, with a
+   reload cycle as one MultiSend), the bridge permission, and the
+   must-fail list, with a
    direct router call, a direct `mint`, the position NFT's transfers and
    approvals, an approval to another spender or above the allowance, and a
    `collect` to another recipient among it.
@@ -589,9 +562,9 @@ session notes):
 
 - **Daily use, one Ledger tap, no vault key:** swaps through Pilot on
   supported chains and through the app's panel on Robinhood Chain; bridges
-  the same way; Hyperliquid deposits from the app; Hyperliquid trading with
-  the browser agent. **Rare, with two keys:** withdrawing from
-  Hyperliquid, moving anything out of the Safe, changing the policy,
+  the same way; Hyperliquid deposits, and withdrawals back to the Safe,
+  from the app; Hyperliquid trading with the browser agent. **Rare, with
+  two keys:** moving anything out of the Safe, changing the policy,
   clearing the pause (two owners of the 2-of-3 Safe in Safe{Wallet} or
   Rabby's Safe mode, queued through the Delay, executed after the
   cooldown). **Rarest, with all three keys:** the break-glass withdrawal,
@@ -606,8 +579,8 @@ session notes):
   design, and the reason the other changes are batched for the vault
   key's visits.
 - Under a wrench attack the home key alone can trade within the allowlists
-  and move money between the owner's own addresses, including the
-  Hyperliquid deposit account up to its allowance. The one priced exit is
+  and move money between the owner's own addresses, the Safe's
+  Hyperliquid account included. The one priced exit is
   the degen allowance: a coerced buy of the attacker's token in a pool the
   attacker has funded past the absolute floor, capped per period. A
   coerced listing costs the attacker the cooldown with the owner in hand,
@@ -618,8 +591,7 @@ session notes):
   allowance per day. The residuals, each accepted by the owner
   (2026-11-05): after the three-day listing cooldown, the listed path's
   per-period notional into a pool of the thief's own, unless the vault key
-  skips the listing first; the Hyperliquid deposit allowance, if that
-  account's key is kept with the home key; and a sandwich of the Safe's
+  skips the listing first; and a sandwich of the Safe's
   own sales in their real pool by a thief who also has the capital to
   move that pool (which they get back), bounded per sale by the 30% sell
   band and by what moving a deep pool's time-weighted price costs. The
@@ -633,15 +605,17 @@ session notes):
   the registry and the approver can at worst widen the listed set or an
   approval to the guard, never move funds. Custom policy is the other
   risk, and the same suite answers it.
-- Costs accepted: the Hyperliquid withdrawal needs both keys; three
+- Costs accepted: the Hyperliquid balance depends on CoreWriter and on
+  the HyperCore-to-HyperEVM USDC link, so it stays at trading size; three
   contracts to audit and a dependency of every trade; a coerced listing is
   delayed and visible, not refused; v4-only pools are
   outside the role until the guard has a reference price there; the engine's reload
   cycles are signed role calls, so the KMS key's gas balance and the
   signer's audit volume scale with how actively it trades; the Zodiac
-  tooling gap on Robinhood Chain is ours to fill; the design is three
-  systems (Safe, Roles, Hyperliquid multi-sig) with three failure modes to
-  rehearse.
+  tooling gap on Robinhood Chain is ours to fill; the design is one
+  system (Safe, Roles, Delay, the guard) on every chain, HyperEVM
+  included, with HyperCore's contract-account mechanics the one thing not
+  of our choosing to rehearse.
 - Products that do parts of this for teams exist (karpatkey's Roles
   policies, Cobo Argus, Turnkey's policy engine, Squads' smart accounts).
   None covers Robinhood Chain, Hyperliquid and a brokerage under one policy

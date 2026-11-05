@@ -16,11 +16,11 @@ the home Ledger and the app's KMS key, scoped to swaps and CLMM
 range-order opens through **the guard** (decided 2026-11-04: an admin-less,
 unowned contract that checks the pool's time-weighted price and depth and
 delivers everything to the Safe; v3-shaped pools only until it has a
-reference price on v4), range-order closes, bridges and the Hyperliquid
-deposit (recommended, to confirm on testnet: the Safe itself as the
-Hyperliquid account, fed by CCTP with the recipient pinned, its Roles
-scoping CoreWriter directly), and buys of unlisted tokens under a
-per-period degen allowance
+reference price on v4), range-order closes, bridges, and on HyperEVM
+the CoreWriter actions of the Safe's own Hyperliquid account (decided
+2026-11-05: the Safe is the account, fed by CCTP with the recipient
+pinned, validated on testnet before live funds; the native multi-sig is
+out), and buys of unlisted tokens under a per-period degen allowance
 (the one priced exit, shaped by the wrench attack); the token set, the
 per-pool parameters and the per-period notionals in a **registry** the
 guard reads, where the home key alone can add a token behind a **listing
@@ -28,8 +28,8 @@ Delay** owned by the vault key with a three-day cooldown (amended
 2026-11-05; the listing attack accepted), an **approver** module that
 grants the guard its token approvals, a wide (30%) band over a short
 window on sales, and a **pause flag** any role member can set; the CoW
-presets out; Hyperliquid: native
-multi-sig with API wallets; the app's key in Cloud KMS; fork tests before
+presets out; Hyperliquid: the same Safe on HyperEVM, API wallets for
+trading; the app's key in Cloud KMS; fork tests before
 any policy goes live; agents never hold a key, never touch mainnet.
 
 ## Build order (EVM + Hyperliquid)
@@ -47,8 +47,8 @@ any policy goes live; agents never hold a key, never touch mainnet.
    Arbitrum, Ethereum and Robinhood Chain: the guard's functions (swap,
    open, bridge) for the trader role, the position manager's close
    functions with the proceeds pinned to the Safe, the registry's remove,
-   the Hyperliquid deposit transfer under its allowance, and the must-fail
-   list (ADR-001); the
+   the CoreWriter policy on HyperEVM, and the must-fail list (ADR-001);
+   the
    apply and verify scripts that read the modifier's events (no subgraph
    on Robinhood Chain).
 3. **Same-address Safes by script** (the funded Safe at 3 of 3, the
@@ -56,20 +56,16 @@ any policy goes live; agents never hold a key, never touch mainnet.
    by the funded Safe; the listing Delay's, owned by the vault key), a
    role call and a queued listing through Rabby with the Ledger — on
    testnets first.
-4. **Hyperliquid on testnet**: first, the Safe itself as the account
-   (ADR-001: a same-address Safe on HyperEVM whose Roles scope CoreWriter
-   as `Calldata`; the whole Zodiac stack is deployed there, read from the
-   chain; a CCTP deposit with the recipient pinned in the hook data,
-   credited to the Safe; API wallets approved through CoreWriter by two
-   keys; funds moved back to the HyperEVM Safe and bridged to Arbitrum
-   over CCTP with the recipient pinned; the fire-and-forget actions
-   confirmed through the precompiles), which would retire the hop, its
-   allowance and the native multi-sig and give the home key the
-   Hyperliquid withdrawal; otherwise the native multi-sig account fed by
-   the same CCTP rail with the recipient pinned to it, and then the multi-sig conversion, agent approval
-   through the multi-sig, trading through the agent, a withdrawal refusing
-   one signature, and the multisig UI (Hyperliquid's own, or the
-   open-source signer).
+4. **Hyperliquid on testnet, the Safe as the account** (decided
+   2026-11-05; ADR-001's Verify step 1): the same-address Safe, Roles and
+   Delay on HyperEVM testnet; the CoreWriter policy scoped as `Calldata`;
+   a CCTP deposit with the recipient pinned in the hook data, credited to
+   the Safe; an API wallet approved through CoreWriter by two keys, then
+   trading through it; a class transfer and a send asset as role calls
+   back to the HyperEVM Safe and a pinned CCTP burn to Arbitrum; every
+   action confirmed through the precompiles, the node tracker's
+   silent-failure report reproduced or ruled out; the refusals; a soak of
+   weeks. Nothing on Hyperliquid goes live before this passes.
 5. **The KMS signer service** and the tracker's intent API, whose intents
    include opening, reloading and closing a range order (a reload cycle is
    one MultiSend role call); the executor's bad-trade residual bounded by
@@ -83,7 +79,8 @@ any policy goes live; agents never hold a key, never touch mainnet.
    the veto is worth nothing unseen.
 8. **Go live in stages**: the funded Safe at threshold 1 for a week, then
    the three owners at 3 of 3 with the 2-of-3 Safe on the Delay;
-   Hyperliquid last, since conversion is one-way.
+   Hyperliquid last, after step 4's soak, with the balance at trading
+   size.
 
 ## Queued, no decision made
 
