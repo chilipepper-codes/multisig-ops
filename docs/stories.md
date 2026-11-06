@@ -11,7 +11,7 @@ Ledger, used through Rabby), the **vault key** (in a bank vault) and a
 **third key** kept off-site. The **app key** is the execution engine's
 Cloud KMS key. Home key and app key are interchangeable below, both being
 members of the trader role, with two exceptions: only the home key can
-queue a listing (story 4), and the app key never signs anything outside
+queue a whitelisting (story 4), and the app key never signs anything outside
 the signer service. Agents never hold any key and never touch mainnet.
 
 ## Funds and keys
@@ -44,13 +44,13 @@ the signer service. Agents never hold any key and never touch mainnet.
    a thief with the home key and the capital to move the pool can
    sandwich the Safe's own sale for up to the band.
 5. **When I want to buy a token I already bought in the past, I can do it
-   at once with the home key.** A listed token: the listed path. A token
-   bought under the degen allowance and never listed: the degen path
-   again, under the allowance, until it is listed. Residual: none.
-6. **I can swap any listed token for any other listed token at once with
-   the home key.** The listed path, debiting the listed notional with the
+   at once with the home key.** A whitelisted token: the whitelisted path. A token
+   bought under the degen allowance and never whitelisted: the degen path
+   again, under the allowance, until it is whitelisted. Residual: none.
+6. **I can swap any whitelisted token for any other whitelisted token at once with
+   the home key.** The whitelisted path, debiting the whitelisted notional with the
    value bought; buys of the reserve set (stablecoins, WETH) count for
-   nothing. Residual: the listed notional per period, set generously.
+   nothing. Residual: the whitelisted notional per period, set generously.
 7. **When I want to buy a new token, I can do so at once with the home key
    up to a value per day; changing that allowance needs two keys plus the
    delay.** The degen allowance in the registry, only in pools quoted in a
@@ -59,24 +59,24 @@ the signer service. Agents never hold any key and never touch mainnet.
    Residual: the allowance per period is what a coercion or a theft
    yields (story 9).
 8. **I can bridge any held token to my own Safe on another chain with the
-   home key.** The guard's bridge: any token, listed or not, the
+   home key.** The guard's bridge: any token, whitelisted or not, the
    destination pinned to the Safe's own address on the other chain, no
    cap. The destination is a parameter of the bridge call, so it is in
    the transaction the Safe signs and the guard sets it to its caller;
    bridges whose recipient lives only in an off-chain quote are not role
    calls. Residual: none.
 
-## Listing
+## Whitelisting
 
-9. **When I plan to buy a new token, I can list it with the home key alone
+9. **When I plan to buy a new token, I can whitelist it with the home key alone
    from the app's UI, and it takes effect after a delay.** The app builds
-   the call, the home Ledger signs it through Rabby, the listing Delay
+   the call, the home Ledger signs it through Rabby, the whitelisting Delay
    holds it for three days, the app's worker executes it; the vault key
-   can skip it. A listing applies default parameters; loosening them is
+   can skip it. A whitelisting applies default parameters; loosening them is
    two-key through the delay; removal is immediate. Residual (accepted):
-   whoever holds the home key can list a coin of their own and, after the
-   cooldown, buy it on the listed path up to that path's per-period
-   notional, unless the listing is skipped first (story 12).
+   whoever holds the home key can whitelist a coin of their own and, after the
+   cooldown, buy it on the whitelisted path up to that path's per-period
+   notional, unless the whitelisting is skipped first (story 12).
 
 ## Attack bounds
 
@@ -84,13 +84,13 @@ the signer service. Agents never hold any key and never touch mainnet.
     per day and nothing else.** The role path has no exit: every swap,
     open, bridge and Hyperliquid transfer delivers to the Safe's own
     address, and approvals go only to the guard. Residuals, each
-    accepted: story 9's listing attack after three days; story 4's
+    accepted: story 9's whitelisting attack after three days; story 4's
     sandwich on sales. Story 11 ends both once noticed.
 11. **I can halt all trading at once with the home key; resuming needs two
     keys plus the delay.** The registry's pause flag, set by any role
     member, cleared through story 2's path. The guard refuses every call
     while it is set. Residual: none.
-12. **I hear within minutes of any listing queued, any Delay entry and any
+12. **I hear within minutes of any whitelisting queued, any Delay entry and any
     trade I did not make.** The monitoring step of the roadmap; its shape
     is to be decided with the owner. Stories 2, 9 and 10 depend on it.
 

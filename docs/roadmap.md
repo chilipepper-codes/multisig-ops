@@ -20,12 +20,12 @@ reference price on v4), range-order closes, bridges, and on HyperEVM
 the CoreWriter actions of the Safe's own Hyperliquid account (decided
 2026-11-05: the Safe is the account, fed by CCTP with the recipient
 pinned, validated on testnet before live funds; the native multi-sig is
-out), and buys of unlisted tokens under a per-period degen allowance
+out), and buys of non-whitelisted tokens under a per-period degen allowance
 (the one priced exit, shaped by the wrench attack); the token set, the
 per-pool parameters and the per-period notionals in a **registry** the
-guard reads, where the home key alone can add a token behind a **listing
+guard reads, where the home key alone can add a token behind a **whitelisting
 Delay** owned by the vault key with a three-day cooldown (amended
-2026-11-05; the listing attack accepted), an **approver** module that
+2026-11-05; the whitelisting attack accepted), an **approver** module that
 grants the guard its token approvals, a wide (30%) band over a short
 window on sales, and a **pause flag** any role member can set; the CoW
 presets out; Hyperliquid: the same Safe on HyperEVM, API wallets for
@@ -41,9 +41,9 @@ any policy goes live; agents never hold a key, never touch mainnet.
    guard (swap and range-order open; time-weighted reference price,
    deviation band, tick distance, a depth floor relative to the trade and
    an absolute one through a pricing path over the chain's own pools), the
-   registry (the listed set, per-pool parameters with defaults, the two
+   registry (the whitelisted set, per-pool parameters with defaults, the two
    per-period notionals) and the approver, with their fork tests; the
-   listing Delay in front of the registry; and the policies for Base,
+   whitelisting Delay in front of the registry; and the policies for Base,
    Arbitrum, Ethereum and Robinhood Chain: the guard's functions (swap,
    open, bridge) for the trader role, the position manager's close
    functions with the proceeds pinned to the Safe, the registry's remove,
@@ -53,8 +53,8 @@ any policy goes live; agents never hold a key, never touch mainnet.
    on Robinhood Chain).
 3. **Same-address Safes by script** (the funded Safe at 3 of 3, the
    2-of-3 Safe on its Delay), the Delay cooldowns (the owner path's, owned
-   by the funded Safe; the listing Delay's, owned by the vault key), a
-   role call and a queued listing through Rabby with the Ledger — on
+   by the funded Safe; the whitelisting Delay's, owned by the vault key), a
+   role call and a queued whitelisting through Rabby with the Ledger — on
    testnets first.
 4. **Hyperliquid on testnet, the Safe as the account** (decided
    2026-11-05; ADR-001's Verify step 1): the same-address Safe, Roles and
@@ -69,13 +69,13 @@ any policy goes live; agents never hold a key, never touch mainnet.
 5. **The KMS signer service** and the tracker's intent API, whose intents
    include opening, reloading and closing a range order (a reload cycle is
    one MultiSend role call); the executor's bad-trade residual bounded by
-   the registry's listed set and notionals and the engine's checks.
+   the registry's whitelisted set and notionals and the engine's checks.
 6. **The audit** of the guard, the registry and the approver, its findings
    closed in the fork suite, before any real funds pass through them.
 7. **Monitoring** (owner, 2026-11-05: yes; its shape to be decided with
-   the owner): at the least an alert on every listing queued on the
+   the owner): at the least an alert on every whitelisting queued on the
    Delay, every entry on the owner-path Delay and every role execution,
-   since a coerced listing is delayed and visible rather than refused, and
+   since a coerced whitelisting is delayed and visible rather than refused, and
    the veto is worth nothing unseen.
 8. **Go live in stages**: the funded Safe at threshold 1 for a week, then
    the three owners at 3 of 3 with the 2-of-3 Safe on the Delay;
@@ -88,7 +88,7 @@ any policy goes live; agents never hold a key, never touch mainnet.
 The guard's price and depth checks rest on v3's `observe`; a v4 pool has
 no oracle of its own, so v4 pools are outside the role (ADR-001). The open
 question is the guard's reference price there: a v3 pool of the same pair
-with enough depth, or a hook oracle listed pool by pool. Decided when the
+with enough depth, or a hook oracle whitelisted pool by pool. Decided when the
 engine's v3-versus-v4 measurement (portfolio-tools ADR-014, paper mode)
 shows that v4-only pairs matter.
 
@@ -115,7 +115,7 @@ decided and another solution possible when the work is taken up:
 
 ### Ideas, not committed
 - **Hyperliquid withdrawal whitelist**: ask Hyperliquid for a destination
-  allowlist on `withdraw3`; it would give the home-key-only withdrawal the
+  whitelist on `withdraw3`; it would give the home-key-only withdrawal the
   design cannot offer today.
 - **UniswapX intents through the Safe** once Roles v3 ships its typed-message
   signing library, as a second swap path on Robinhood Chain that needs no
@@ -123,13 +123,13 @@ decided and another solution possible when the work is taken up:
 - **External feeds on the guard** (Chainlink, Pyth) as a sanity check on a
   tokenized stock's pricing hop, where a feed is deployed on the chain;
   never a dependency (ADR-001, the guard).
-- **An off-site guardian** as the listing Delay's owner, a third party who
-  can veto a queued listing alone while the owner is held; today the
+- **An off-site guardian** as the whitelisting Delay's owner, a third party who
+  can veto a queued whitelisting alone while the owner is held; today the
   owner holds all three keys and the Delay's owner is the vault key
   (ADR-001).
-- **Probation for new listings**: a token listed from the home key keeps
+- **Probation for new whitelistings**: a token whitelisted from the home key keeps
   counting against the degen allowance for its first days, closing the
-  listing attack the owner accepted (ADR-001); a timestamp in the
+  whitelisting attack the owner accepted (ADR-001); a timestamp in the
   registry if ever wanted.
 - **Scheduled policy drift checks**: the fork suite on a schedule against
   the live policy, since routers and protocols move.
