@@ -26,7 +26,10 @@ per-pool parameters and the per-period notionals in a **registry** the
 guard reads, where the home key alone can add a token behind a **whitelisting
 Delay** owned by the vault key with a three-day cooldown (amended
 2026-11-05; the whitelisting attack accepted), an **approver** module that
-grants the guard its token approvals, a wide (30%) band over a short
+grants the guard its token approvals, deposits to the owner's Kraken
+account at an address the registry pins per chain (owner, 2026-11-06:
+Kraken's global settings lock makes it another vault of the owner's), a
+wide (30%) band over a short
 window on sales, and a **pause flag** any role member can set; the CoW
 presets out; Hyperliquid: the same Safe on HyperEVM, API wallets for
 trading; the app's key in Cloud KMS; fork tests before
@@ -47,7 +50,8 @@ any policy goes live; agents never hold a key, never touch mainnet.
    Arbitrum, Ethereum and Robinhood Chain: the guard's functions (swap,
    open, bridge) for the trader role, the position manager's close
    functions with the proceeds pinned to the Safe, the registry's remove,
-   the CoreWriter policy on HyperEVM, and the must-fail list (ADR-001);
+   the CoreWriter policy on HyperEVM, the Kraken deposit address pinned
+   per chain, and the must-fail list (ADR-001);
    the
    apply and verify scripts that read the modifier's events (no subgraph
    on Robinhood Chain).

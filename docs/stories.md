@@ -83,9 +83,11 @@ the signer service. Agents never hold any key and never touch mainnet.
 10. **An attacker with the home key can take out the degen allowance once
     per day and nothing else.** The role path has no exit: every swap,
     open, bridge and Hyperliquid transfer delivers to the Safe's own
-    address, and approvals go only to the guard. Residuals, each
-    accepted: story 9's whitelisting attack after three days; story 4's
-    sandwich on sales. Story 11 ends both once noticed.
+    address, approvals go only to the guard, and the one external
+    destination, the owner's Kraken account (story 17), returns funds only
+    to the bank or the Safes. Residuals, each accepted: story 9's
+    whitelisting attack after three days; story 4's sandwich on sales.
+    Story 11 ends both once noticed.
 11. **I can halt all trading at once with the home key; resuming needs two
     keys plus the delay.** The registry's pause flag, set by any role
     member, cleared through story 2's path. The guard refuses every call
@@ -122,6 +124,19 @@ the signer service. Agents never hold any key and never touch mainnet.
     Hyperliquid-operated, so the balance there is kept at trading size;
     CoreWriter actions are fire-and-forget, so the engine confirms each
     one through the precompiles and treats "not landed" as retryable.
+
+## Exchange
+
+17. **I can deposit to my Kraken account with the home key alone.** The
+    guard's `sendToExchange` transfers a whitelisted token to the Kraken
+    deposit address the registry pins for that chain, set by two keys
+    through the delay; no cap, since Kraken's global settings lock is on
+    and the account's withdrawal destinations are only my bank and the
+    Safes, so a deposit is a move into another vault of mine. Only on
+    chains and for tokens Kraken accepts. Residual: the path is as safe as
+    Kraken's lock and allowlist, which I keep on with a long unlock wait,
+    and a pinned address is proved by a small test deposit before it is
+    pinned; a wrench attacker can push the book to Kraken and no further.
 
 ## Operations
 

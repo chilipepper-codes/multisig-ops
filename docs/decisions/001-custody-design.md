@@ -98,9 +98,12 @@ session notes):
   call); closing a range position on the position manager with the
   proceeds pinned to the Safe; removing a token from the registry; on
   HyperEVM, the CoreWriter actions the Hyperliquid section lists, scoped
-  as calldata. Nothing the role allows sends funds to an address that is
-  not the Safe's own (amended 2026-11-05: the Hyperliquid deposit hop, the
-  one such transfer, is gone with the native multi-sig). The token set, the per-pool parameters and
+  as calldata; deposits to the owner's Kraken account at the pinned
+  address (the Kraken bullet below). Nothing else the role allows sends
+  funds to an address that is not the Safe's own (amended 2026-11-05: the
+  Hyperliquid deposit hop, the one such transfer, is gone with the native
+  multi-sig; amended 2026-11-06: the Kraken deposit is the one that
+  remains, and it is an exit only into another vault of the owner's). The token set, the per-pool parameters and
   the per-period notionals are the registry's, not Roles conditions
   (amended 2026-11-05: Roles scopes calls per target address and cannot
   scope "approve on any token", so a token set in Roles would make every
@@ -297,6 +300,33 @@ session notes):
     a thin pool over several blocks, so the band is a cost imposed on a
     compromised engine, not a wall; with the depth floor that cost is what
     it takes to move a deep pool.
+- **Deposits to the owner's Kraken account are a home-key action (owner,
+  2026-11-06).** Kraken's global settings lock is on for the account, and
+  the owner has confirmed only two withdrawal destinations there: the
+  owner's bank account and the Safes. With the lock on, a new destination
+  cannot be added without the lock's own unlock wait, so funds that reach
+  Kraken can only come back to the Safes or go to the bank. That makes a
+  deposit to Kraken a transfer into another vault of the owner's, with a
+  delay the owner configured rather than one of ours, and so a role call:
+  the one address outside the Safe system the role may send to. How: the
+  registry holds, per chain, the Kraken deposit address for the owner's
+  account, set and changed by two keys through the Delay, and the guard
+  gains a `sendToExchange` function that pulls a whitelisted token (the
+  approver grants the approval) and transfers it to that address, nothing
+  else; no price check and no cap, since the destination is the owner's.
+  Only on chains and for tokens Kraken accepts (USDC and ETH on Ethereum,
+  Arbitrum, Base, Optimism, Polygon at the time of writing; nothing on
+  Robinhood Chain, so those funds bridge to the Arbitrum Safe first); the
+  engine or the owner checks Kraken's current networks before each pin.
+  Operational rules that carry the whole safety of this path: the lock
+  stays on, with a long unlock wait; the destination allowlist at Kraken
+  holds only the bank and the Safes; a pinned address is proved with a
+  small test deposit before the policy change that pins it; and the
+  monitoring step alerts on every deposit to it. The must-fail list gains
+  a transfer to any other external address. Under a wrench attack the
+  attacker can push the book to Kraken and no further than Kraken's own
+  controls allow, which is the bank or the Safes; under a stolen home key
+  the funds are recoverable by the owner through Kraken.
 - **CLMM range orders (amended 2026-11-02; opened through the guard since
   2026-11-04).** The execution engine rests its limit orders as
   single-sided concentrated-liquidity positions: a range entirely above the
@@ -545,8 +575,10 @@ session notes):
    role call, the guard refuses everything; cleared only through the
    Delay), the close permission on the
    position manager (a partial fill decreased and collected to the Safe, a
-   reload cycle as one MultiSend), the bridge permission, and the
-   must-fail list, with a
+   reload cycle as one MultiSend), the bridge permission, the Kraken
+   deposit (a `sendToExchange` to the pinned address passes; to any other
+   address reverts; changing the pinned address by the role reverts), and
+   the must-fail list, with a
    direct router call, a direct `mint`, the position NFT's transfers and
    approvals, an approval to another spender or above the allowance, and a
    `collect` to another recipient among it.
@@ -585,8 +617,10 @@ session notes):
   attacker has funded past the absolute floor, capped per period. A
   coerced whitelisting costs the attacker the cooldown with the owner in hand,
   visible on chain, and then at most the whitelisted path's per-period
-  notional in a pool that clears the floors. It cannot send anything
-  elsewhere.
+  notional in a pool that clears the floors. It can send the book to the
+  owner's Kraken account, where Kraken's global settings lock allows
+  withdrawals only to the bank or back to the Safes. It cannot send
+  anything elsewhere.
 - **A stolen home key**, with no owner to coerce, takes the degen
   allowance per day. The residuals, each accepted by the owner
   (2026-11-05): after the three-day whitelisting cooldown, the whitelisted path's
@@ -594,8 +628,9 @@ session notes):
   skips the whitelisting first; and a sandwich of the Safe's
   own sales in their real pool by a thief who also has the capital to
   move that pool (which they get back), bounded per sale by the 30% sell
-  band and by what moving a deep pool's time-weighted price costs. The
-  pause flag ends all of it the moment
+  band and by what moving a deep pool's time-weighted price costs. A
+  deposit to Kraken moves funds the thief cannot reach into the owner's
+  own exchange account. The pause flag ends all of it the moment
   the owner notices, with the home key; the monitoring step is what makes
   noticing likely.
 - Custom Solidity is the guard, the registry and the approver: holding no
