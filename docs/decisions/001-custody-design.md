@@ -285,13 +285,28 @@ session notes):
     (a new chain, an NFT, an exotic protocol): withdraw the allowance to a
     hot wallet and go, and whatever comes back lands in the Safe like any
     inbound transfer. **The window is rolling and equal to the owner
-    path's cooldown:** debits expire after one cooldown, so any window of
-    that length yields at most one allowance, with no double take at a
-    period boundary, and an attacker holding the owner for a full
-    cooldown gets one allowance or, with the vault key too, a delayed
-    withdrawal, never faster. The Delay does not apply to the allowance,
-    by design. The absolute floor still applies to a degen buy, which
-    needs a real pool; the withdrawal needs nothing but the bucket. Selling any token the Safe holds back
+    path's cooldown:** the registry keeps each debit with its timestamp
+    and sums those younger than one cooldown, so a new debit passes only
+    if the trailing sum stays under the allowance, and any window of that
+    length yields at most one allowance, with no double take at a period
+    boundary (a calendar reset would hand an attacker who arrives just
+    before the boundary two allowances in a night; a continuously
+    refilling bucket would hand them a full take plus a cooldown's refill,
+    twice the allowance in a span, so neither is used); an attacker
+    holding the owner for a full cooldown gets one allowance or, with the
+    vault key too, a delayed withdrawal, never faster. The Delay does not
+    apply to the allowance, by design. **What still holds on a degen
+    buy**, which loses only the backstop and the whitelisted path's
+    notional: the caller's minimum, shown to the owner before signing and
+    verified by the signer for the engine; the outcome rule, so the bought
+    token lands in the Safe and nothing leaves but the input; the absolute
+    floor, so the pool is quoted in a stablecoin or WETH and holds real
+    money; the bucket; and the pool of first buy recorded as where the
+    token sells. Its remaining value over a withdrawal to a hot wallet is
+    custody: the position sits in the Safe from day one, and a later
+    whitelisting gives it the full path and a backstop. Not a priority
+    (owner, 2026-11-09), built when convenient. The withdrawal needs
+    nothing but the bucket. Selling any token the Safe holds back
     into the reserve set is never capped and needs no whitelisting, since the
     approver grants the guard its approval at sale time. A token bought
     under the degen allowance stays on the degen path, re-buys included,
