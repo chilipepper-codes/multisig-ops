@@ -138,6 +138,19 @@ the signer service. Agents never hold any key and never touch mainnet.
     and a pinned address is proved by a small test deposit before it is
     pinned; a wrench attacker can push the book to Kraken and no further.
 
+## Venues
+
+18. **I can trade any pool on any AMM or aggregator the policy
+    whitelists, with the home key: Uniswap v2, v3 and v4, Aerodrome on
+    Base, others as they come.** The guard checks the outcome of a swap
+    against the token's reference pool, not the route, so the route is the
+    engine's; a new AMM is a router entry in the policy, a new pool kind a
+    small read adapter with its fork tests. Range orders work on every
+    concentrated-liquidity manager the policy whitelists, v4's included.
+    Residual: the price check is as good as the reference pool's history;
+    a pool with none trades on the floors and the notionals alone, by my
+    choice per pool.
+
 ## Operations
 
 15. **I can replace a contract (the guard, the registry, the approver, a

@@ -14,9 +14,11 @@ every other owner action through the Delay (decided 2026-11-05), Roles on
 it, one trader role for
 the home Ledger and the app's KMS key, scoped to swaps and CLMM
 range-order opens through **the guard** (decided 2026-11-04: an admin-less,
-unowned contract that checks the pool's time-weighted price and depth and
-delivers everything to the Safe; v3-shaped pools only until it has a
-reference price on v4), range-order closes, bridges, and on HyperEVM
+unowned contract that checks a trade's outcome against the token's
+reference pool's time-weighted price and depth and delivers everything to
+the Safe, through any whitelisted router, so every AMM is reachable,
+Uniswap v2, v3 and v4 and Aerodrome among them; amended 2026-11-09),
+range-order closes, bridges, and on HyperEVM
 the CoreWriter actions of the Safe's own Hyperliquid account (decided
 2026-11-05: the Safe is the account, fed by CCTP with the recipient
 pinned, validated on testnet before live funds; the native multi-sig is
@@ -41,9 +43,12 @@ any policy goes live; agents never hold a key, never touch mainnet.
    each chain, a policy applied, the allowed list passing and the must-fail
    list reverting. The acceptance test everything else is measured against.
 2. **The guard, the registry, the approver and the policy as code.** The
-   guard (swap and range-order open; time-weighted reference price,
-   deviation band, tick distance, a depth floor relative to the trade and
-   an absolute one through a pricing path over the chain's own pools), the
+   guard (swap by outcome check through any whitelisted router, range-order
+   open and v4 close, bridge, send to exchange; the read adapters per pool
+   kind: Uniswap v3 and forks, Aerodrome v2-style, Uniswap v2 with the
+   registry's snapshot store, Algebra, v4 by sibling or sampled
+   observations; deviation band, tick distance, a depth floor relative to
+   the trade and an absolute one through a pricing path), the
    registry (the whitelisted set, per-pool parameters with defaults, the two
    per-period notionals) and the approver, with their fork tests; the
    whitelisting Delay in front of the registry; and the policies for Base,
@@ -87,14 +92,6 @@ any policy goes live; agents never hold a key, never touch mainnet.
    size.
 
 ## Queued, no decision made
-
-### v4 pools through the guard
-The guard's price and depth checks rest on v3's `observe`; a v4 pool has
-no oracle of its own, so v4 pools are outside the role (ADR-001). The open
-question is the guard's reference price there: a v3 pool of the same pair
-with enough depth, or a hook oracle whitelisted pool by pool. Decided when the
-engine's v3-versus-v4 measurement (portfolio-tools ADR-014, paper mode)
-shows that v4-only pairs matter.
 
 ### Solana expansion
 Same requirements, different toolbox (ADR-001, last section). **Ruled out

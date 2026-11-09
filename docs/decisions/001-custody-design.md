@@ -117,9 +117,31 @@ session notes):
   single-sided against the moved price, swap back through it, all in one
   bundle. The guard derives the bounds on-chain instead of trusting the
   caller's parameters:
-  - **The reference price** is the pool's time-weighted price (`observe`),
-    never `slot0`, which is what the attacker moves. The checks below
-    apply to buys and to sales alike, with different parameters. **Sales
+  - **The reference price comes from the token's reference pool, through a
+    read adapter per pool kind** (amended 2026-11-09: the owner trades
+    v2, v3 and v4 pools and other AMMs, Aerodrome on Base among them, and
+    the guard must not stand in the way). The registry names, per token,
+    a reference pool and its kind; the guard reads a time-weighted price
+    and the depth from it with the adapter for that kind, never a spot
+    price, which is what an attacker moves. The kinds: Uniswap v3 and its
+    forks (Aerodrome Slipstream, PancakeSwap v3) through `observe`;
+    Aerodrome and Velodrome v2-style pools, volatile and stable, through
+    their own built-in observations (`quote` over the pool's samples,
+    reserves for the depth, the stable curve's math for the band);
+    Uniswap v2 pairs through their cumulative price accumulators against
+    a snapshot the registry keeps (a permissionless keeper records the
+    cumulative at intervals; the average between two snapshots is exact
+    whoever takes them and whenever, with a minimum window enforced);
+    Algebra pools through their oracle plugin; Uniswap v4 pools, which
+    have no oracle of their own, through a sibling pool of the same pair
+    that has one, else through sampled observations that designated
+    keepers record at a minimum spacing (the engine's worker and an
+    independent automation, a two-key set, since timing can be gamed
+    there), the guard taking the median over the window; and, for a token
+    with no reference worth trusting, none, the owner's choice per pool,
+    with the floors and the notionals as the only bounds, which is the
+    degen path's default. The checks below apply to buys and to sales
+    alike, with different parameters. **Sales
     get a wide band, 30% by default, over a short window** (owner,
     2026-11-05): a rug must be exitable at once with the home key, and a
     narrow band against a lagging time-weighted price would lock the owner
@@ -130,20 +152,41 @@ session notes):
     the window can hold a sale back, at most the window itself. With the
     whitelist and the degen allowance in place the checks need not be
     stringent anywhere, so the buy-side defaults are loose too, tightened
-    per pool by the owner. On every sale the guard sells only through a
-    pool the registry knows for the token (the whitelisted pool, or the pool a
-    degen token was first bought in), never one the caller names, so a
-    thief cannot route a sale to a pool of their own; a pool with no
-    time-weighted price yet (a young one) passes a sale on that rule
-    alone.
-  - **A swap** pulls the input from its caller, the Safe, computes the
-    minimum output
-    from the reference price less a maximum deviation, calls the whitelisted
-    router, delivers the whole output to the Safe, and reverts otherwise.
+    per pool by the owner. On every sale the guard checks the outcome
+    against the token's reference pool (the whitelisted one, or the pool a
+    degen token was first bought in), whatever route the caller supplies,
+    so a thief gains nothing by routing a sale through a pool of their
+    own: the output still has to clear the reference; a token with no
+    reference yet passes a sale on the floors alone.
+  - **A swap checks the outcome, not the route.** The guard pulls exactly
+    the input from its caller, the Safe, approves exactly that amount to a
+    whitelisted router or aggregator, calls it with the calldata the
+    caller supplies, and then requires that its own balance of the output
+    token grew by at least the minimum it derives from the reference price
+    less the band; everything that came back, output and unspent input,
+    goes to the Safe, and anything short reverts. The route is the
+    engine's business, so every AMM a whitelisted router reaches is
+    tradable: Uniswap's Universal Router for v2, v3 and v4 (hooked pools
+    included, since what matters is what came back), Aerodrome's routers
+    on Base, an aggregator (1inch, Odos, KyberSwap, 0x) spanning all of
+    them. Routers are a two-key whitelist. The calldata can spend only the
+    amount approved for this call, the guard holds nothing between calls,
+    and a route that sends the output anywhere but the guard fails the
+    check.
   - **A range open** mints a single-sided position whose range lies on the
     correct side of the reference price and within a few tick spacings of
     it, with the minimum equal to the amount offered (a range the price has
-    already entered reverts), the NFT to the Safe.
+    already entered reverts), the NFT to the Safe, on any
+    concentrated-liquidity manager the registry whitelists: Uniswap v3's
+    and its forks' position managers (Aerodrome Slipstream among them),
+    and Uniswap v4's PositionManager, whose command bytes the guard builds
+    itself with the recipient pinned, so Roles never needs conditions on
+    them; on v4 the guard also does the close, since a direct role call
+    cannot scope those bytes. A hooked v4 pool is whitelisted for range
+    orders only by two keys after a look at the hook, since a hook can
+    touch position liquidity; for swaps the outcome check makes the hook
+    irrelevant. Pools with no concentrated liquidity (v2 pairs, Aerodrome
+    volatile and stable) have swaps only.
   - **A bridge** (2026-11-05) pulls any held token, whitelisted or not, and
     calls a whitelisted bridge with the destination pinned to the Safe's own
     address on the other chain; no price check and no cap, since the
@@ -223,8 +266,10 @@ session notes):
     records the pool of that first buy as the token's pool, which is where
     the guard will sell it. The engine grows the pool's cardinality in the
     same batch as its first buy, so a sell band can be switched on for the
-    position later if wanted. Launches on v2 pairs and on v4 are outside
-    the guard and so outside the role.
+    position later if wanted. Launches on v2 pairs, on v4 (the launchpads'
+    hooked pools included) and on other AMMs are reachable like any other
+    pool: the route is the engine's, the outcome check is the guard's, and
+    a young pool with no reference passes on the floors and the allowance.
   - **The registry holds the policy the guard reads (option B, owner,
     2026-11-05).** One contract per chain, owned by the funded Safe (so
     two keys through the Delay, or three direct), holding: the whitelisted set,
@@ -283,18 +328,19 @@ session notes):
     the guard squarely in the trust path: a bug in it could misroute what
     it is approved to pull. That is why the audit covers the guard, the
     registry and the approver together, before real funds.
-  - **v3-shaped pools only, for now.** The reference price is v3's built-in
-    `observe`. A v4 pool has no oracle of its own, only what a hook
-    provides, and a hook also changes the swap math, so the guard's price
-    and depth checks are not defined there and v4 pools stay outside the
-    role. Reaching v4 through the guard (which would spare the role any
-    conditions on command bytes) is a queued decision whose open question
-    is the reference price: a v3 pool of the same pair with enough depth,
-    or a hook oracle whitelisted pool by pool. It is taken when the engine's
-    v3-versus-v4 measurement (portfolio-tools ADR-014, paper mode) shows
-    that v4-only pairs matter.
-  - **Cost:** custom Solidity in the trust path, the guard, the registry
-    and the approver together a few hundred lines, so an audit before real
+  - **Every AMM, through adapters (amended 2026-11-09).** The guard
+    separates where it checks from where it trades. Execution is any
+    whitelisted router with an outcome check, so no AMM is out of reach
+    and a new one costs a router entry in the policy, not code. The
+    reference price needs a read adapter per pool kind, the small set
+    above, each a few dozen lines; a new kind is an adapter with its fork
+    tests, a two-key change. What the guard cannot do is conjure a
+    trustworthy price for a pool with no history: there the check is off,
+    by the owner's per-pool choice, and the floors and the notionals
+    bound the trade.
+  - **Cost:** custom Solidity in the trust path, the guard with its read
+    adapters, the registry with its snapshot store, and the approver,
+    together under a thousand lines, so an audit before real
     funds, and the fork suite testing their reverts as it tests the
     policy's. The time-weighted price is itself movable on
     a thin pool over several blocks, so the band is a cost imposed on a
@@ -332,9 +378,11 @@ session notes):
   single-sided concentrated-liquidity positions: a range entirely above the
   price sells through it, one entirely below buys through it, and the
   position earns the pool fee from the flow that fills it. The open goes
-  through the guard (above), which mints the position to the Safe on a
-  v3-shaped manager (Uniswap v3's NonfungiblePositionManager; Aerodrome
-  Slipstream on Base; PancakeSwap v3; Camelot on Arbitrum). The close has
+  through the guard (above), which mints the position to the Safe on any
+  position manager the registry whitelists (Uniswap v3's
+  NonfungiblePositionManager; Aerodrome Slipstream on Base; PancakeSwap
+  v3; Camelot on Arbitrum; Uniswap v4's PositionManager, open and close
+  both through the guard). The close has
   no price exposure, so it is the Safe's own call on the manager, allowed
   by the role directly: `decreaseLiquidity` (moves nothing); `collect` with
   the recipient pinned to the Safe, `address(0)` rejected (it means
@@ -373,19 +421,22 @@ session notes):
     A lost key leaves this path intact with the other two.
   Rehearse the skip and the expiration on a fork. Role calls bypass the
   Delay by design.
-- **Swaps go through the guard, on every chain, v3 routers first.** On
-  Robinhood Chain the guard calls Uniswap v3's SwapRouter02; v4 pools stay
-  outside the role until the queued decision above gives the guard a
-  reference price there. Amended 2026-11-04: the CoW presets are out of the role. The
+- **Swaps go through the guard, on every chain, through any whitelisted
+  router.** On Robinhood Chain that is Uniswap's Universal Router (v2, v3
+  and v4 pools) and whatever aggregator covers the chain; on Base,
+  Uniswap's and Aerodrome's; v4 pools are in from the start, their
+  reference price from a sibling pool, from sampled observations or none,
+  as the registry says per pool. Amended 2026-11-04: the CoW presets are out of the role. The
   engine does not use CoW (a solver fills a resting order on its own terms,
   a range order fills from the pool's flow and earns the fee), the presets
   were one more code path on the Safe to fork-test, and the ERC-1271 path
   they rely on is where the June bug lived. They can come back as a policy
   change if the owner wants CoW for manual swaps through Pilot. Before this
   amendment the design kept custom Solidity out until a measurement said
-  v4 mattered; the guard is now justified by the residual it closes (the
-  app's key, below), and the measurement stays as the trigger for the v4
-  decision.
+  v4 mattered; the guard is justified by the residual it closes (the
+  app's key, below), v4 is in through the outcome check, and the engine's
+  v3-versus-v4 measurement (portfolio-tools ADR-014) is fill-quality
+  information for the engine, with no custody decision waiting on it.
 - **Tooling on Robinhood Chain is ours.** Policy as code with the Roles SDK's
   condition utilities, applied through the Safe by script and read back from
   the modifier's events over RPC (no subgraph there); the app builds
@@ -643,8 +694,8 @@ session notes):
 - Costs accepted: the Hyperliquid balance depends on CoreWriter and on
   the HyperCore-to-HyperEVM USDC link, so it stays at trading size; three
   contracts to audit and a dependency of every trade; a coerced whitelisting is
-  delayed and visible, not refused; v4-only pools are
-  outside the role until the guard has a reference price there; the engine's reload
+  delayed and visible, not refused; a pool without a trustworthy price history trades with no price check,
+  bounded by the floors and the notionals; the engine's reload
   cycles are signed role calls, so the KMS key's gas balance and the
   signer's audit volume scale with how actively it trades; the Zodiac
   tooling gap on Robinhood Chain is ours to fill; the design is one
