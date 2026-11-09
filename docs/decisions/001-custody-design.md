@@ -583,9 +583,9 @@ session notes):
 - **The fork test suite comes before any policy goes live**: every allowed
   call passes, a list of must-fail calls (a transfer out, an approval to
   another spender or above the allowance, a router or a `mint` called
-  outside the guard, an non-whitelisted token) reverts, and the guard's own reverts hold (a swap past
+  outside the guard, a non-whitelisted token) reverts, and the guard's own reverts hold (a swap past
   the band, an open against a moved spot, a trade larger than the pool's
-  depth allows, a pricing hop under its floor, a buy of an non-whitelisted token
+  depth allows, a pricing hop under its floor, a buy of a non-whitelisted token
   above the degen allowance or in a pool under the absolute floor or
   quoted in another non-whitelisted token),
   on every chain, on every policy change and on a schedule. Policy is code that fails
@@ -613,7 +613,7 @@ session notes):
    delivers to the Safe; a swap after a flash move of the spot reverts; a
    single-sided open to the Safe; an open against a moved spot reverts; a
    trade larger than the pool's depth allows reverts; a quote priced
-   through a hop under its floor reverts; a buy of an non-whitelisted token
+   through a hop under its floor reverts; a buy of a non-whitelisted token
    passes under the degen allowance in a young pool over the floor, and
    reverts above the allowance, under the floor, or quoted in another
    non-whitelisted token), the registry and the whitelisting Delay (an add queued by
