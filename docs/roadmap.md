@@ -14,16 +14,19 @@ every other owner action through the Delay (decided 2026-11-05), Roles on
 it, one trader role for
 the home Ledger and the app's KMS key, scoped to swaps and CLMM
 range-order opens through **the guard** (decided 2026-11-04: an admin-less,
-unowned contract that checks a trade's outcome against the token's
-reference pool's time-weighted price and depth and delivers everything to
-the Safe, through any whitelisted router, so every AMM is reachable,
-Uniswap v2, v3 and v4 and Aerodrome among them; amended 2026-11-09),
+unowned contract that checks a trade's outcome against the caller's
+minimum, shown to the owner before signing, and, where the token has a
+backstop pool with a free oracle, against its time-weighted price and
+depth, and delivers everything to the Safe, through any whitelisted
+router, so every AMM is reachable, Uniswap v2, v3 and v4 and Aerodrome
+among them; amended 2026-11-09),
 range-order closes, bridges, and on HyperEVM
 the CoreWriter actions of the Safe's own Hyperliquid account (decided
 2026-11-05: the Safe is the account, fed by CCTP with the recipient
 pinned, validated on testnet before live funds; the native multi-sig is
-out), and buys of non-whitelisted tokens under a per-period degen allowance
-(the one priced exit, shaped by the wrench attack); the token set, the
+out), and the degen allowance, one rolling cooldown window, spent on
+non-whitelisted buys or withdrawn to any address with the home key (the
+one priced exit, handed over under duress by design; owner, 2026-11-09); the token set, the
 per-pool parameters and the per-period notionals in a **registry** the
 guard reads, where the home key alone can add a token behind a **whitelisting
 Delay** owned by the vault key with a three-day cooldown (amended
@@ -43,12 +46,12 @@ any policy goes live; agents never hold a key, never touch mainnet.
    each chain, a policy applied, the allowed list passing and the must-fail
    list reverting. The acceptance test everything else is measured against.
 2. **The guard, the registry, the approver and the policy as code.** The
-   guard (swap by outcome check through any whitelisted router, range-order
-   open and v4 close, bridge, send to exchange; the read adapters per pool
-   kind: Uniswap v3 and forks, Aerodrome v2-style, Uniswap v2 with the
-   registry's snapshot store, Algebra, v4 by sibling or sampled
-   observations; deviation band, tick distance, a depth floor relative to
-   the trade and an absolute one through a pricing path), the
+   guard (swap by outcome check against the caller's minimum through any
+   whitelisted router, range-order open and v4 close, bridge, send to
+   exchange, withdraw allowance; the backstop's read adapters for the
+   free-oracle kinds only: Uniswap v3 and forks, Aerodrome v2-style,
+   Algebra; deviation band, tick distance, a depth floor relative to the
+   trade and an absolute one through a pricing path), the
    registry (the whitelisted set, per-pool parameters with defaults, the two
    per-period notionals) and the approver, with their fork tests; the
    whitelisting Delay in front of the registry; and the policies for Base,
@@ -128,6 +131,11 @@ decided and another solution possible when the work is taken up:
   can veto a queued whitelisting alone while the owner is held; today the
   owner holds all three keys and the Delay's owner is the vault key
   (ADR-001).
+- **Keepers for reference prices without a free oracle** (owner,
+  2026-11-09: only if practice shows tokens of interest with no
+  free-oracle pool): Uniswap v2 pairs through their cumulative
+  accumulators against registry snapshots, Uniswap v4 pools through
+  sampled observations by designated keepers (ADR-001, the guard).
 - **Probation for new whitelistings**: a token whitelisted from the home key keeps
   counting against the degen allowance for its first days, closing the
   whitelisting attack the owner accepted (ADR-001); a timestamp in the

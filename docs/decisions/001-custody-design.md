@@ -117,31 +117,54 @@ session notes):
   single-sided against the moved price, swap back through it, all in one
   bundle. The guard derives the bounds on-chain instead of trusting the
   caller's parameters:
-  - **The reference price comes from the token's reference pool, through a
-    read adapter per pool kind** (amended 2026-11-09: the owner trades
-    v2, v3 and v4 pools and other AMMs, Aerodrome on Base among them, and
-    the guard must not stand in the way). The registry names, per token,
-    a reference pool and its kind; the guard reads a time-weighted price
-    and the depth from it with the adapter for that kind, never a spot
-    price, which is what an attacker moves. The kinds: Uniswap v3 and its
-    forks (Aerodrome Slipstream, PancakeSwap v3) through `observe`;
-    Aerodrome and Velodrome v2-style pools, volatile and stable, through
-    their own built-in observations (`quote` over the pool's samples,
-    reserves for the depth, the stable curve's math for the band);
-    Uniswap v2 pairs through their cumulative price accumulators against
-    a snapshot the registry keeps (a permissionless keeper records the
-    cumulative at intervals; the average between two snapshots is exact
-    whoever takes them and whenever, with a minimum window enforced);
-    Algebra pools through their oracle plugin; Uniswap v4 pools, which
-    have no oracle of their own, through a sibling pool of the same pair
-    that has one, else through sampled observations that designated
-    keepers record at a minimum spacing (the engine's worker and an
-    independent automation, a two-key set, since timing can be gamed
-    there), the guard taking the median over the window; and, for a token
-    with no reference worth trusting, none, the owner's choice per pool,
-    with the floors and the notionals as the only bounds, which is the
-    degen path's default. The checks below apply to buys and to sales
-    alike, with different parameters. **Sales
+  - **The minimum is the caller's; the reference price is a backstop**
+    (owner, 2026-11-09). The app looks prices up off-chain, shows the
+    owner the amounts it expects to receive and the tolerance, and passes
+    the minimum to the guard, which enforces it on the outcome. That is
+    the primary check, and it is strong wherever the caller is honest:
+    the owner signing through Rabby sees the amounts (Rabby's pre-sign
+    simulation shows the Safe's balance changes, and a Ledger
+    clear-signing descriptor for the guard's calls, ERC-7730, puts the
+    input and the minimum on the hardware screen, which also defeats
+    malware rewriting calldata in the browser); for the engine's own
+    trades the signer service, the separate process that holds the KMS
+    grant, verifies every intent's minimum against its own independent
+    price lookup and refuses to sign past the policy's slippage, so a
+    compromised executor cannot lower it. What a caller-supplied minimum
+    cannot defend against is the caller being the attacker, a stolen home
+    key setting it to zero, or a compromised signer. For that the guard
+    keeps an on-chain **backstop**: where the registry names a reference
+    pool for the token, the effective minimum is the larger of the
+    caller's and the one derived from that pool's time-weighted price less
+    the band, read through a small adapter for the pool's kind, never a
+    spot price, which is what an attacker moves. Only kinds with a **free
+    oracle**, a time-weighted price the pool maintains itself as part of
+    its normal operation, are built: Uniswap v3 and its forks (Aerodrome
+    Slipstream, PancakeSwap v3) through `observe`; Aerodrome and Velodrome
+    v2-style pools, volatile and stable, through their built-in
+    observations (`quote` over the pool's samples, reserves for the depth,
+    the stable curve's math for the band); Algebra pools through their
+    oracle plugin. **The backstop pool is chosen at whitelisting**, by the
+    owner from the app's proposal: the app scans the token's pools on the
+    chain, keeps those of the free-oracle kinds, measures each one's depth
+    in stable terms through the pricing path and proposes the deepest that
+    clears the absolute floor; the owner confirms it in the whitelisting
+    screen, and the pool and its kind are written into the registry entry
+    with the whitelisting itself, so the home key sets it after the
+    cooldown. A token with no such pool is whitelisted without a backstop,
+    and the screen says so. Re-pointing is a parameter change, two keys
+    through the Delay, since pointing at a thin pool is a loosening; the
+    app alerts when a backstop pool's depth falls under the floor, and the
+    guard refuses a buy whose backstop pool no longer clears it until the
+    owner re-points, while a sale still goes through on the wide band.
+    Kinds that would need a keeper of ours (Uniswap v2 pairs through their
+    cumulative accumulators against registry snapshots; Uniswap v4 pools
+    through sampled observations by designated keepers) are **not built**:
+    the owner expects the free-oracle kinds to cover most or all tokens of
+    interest, and the keepers sit at the back of the roadmap as an option
+    if practice says otherwise. A degen token has no backstop by
+    construction. The checks below apply to buys and to sales alike, with
+    different parameters. **Sales
     get a wide band, 30% by default, over a short window** (owner,
     2026-11-05): a rug must be exitable at once with the home key, and a
     narrow band against a lagging time-weighted price would lock the owner
@@ -152,18 +175,18 @@ session notes):
     the window can hold a sale back, at most the window itself. With the
     whitelist and the degen allowance in place the checks need not be
     stringent anywhere, so the buy-side defaults are loose too, tightened
-    per pool by the owner. On every sale the guard checks the outcome
-    against the token's reference pool (the whitelisted one, or the pool a
-    degen token was first bought in), whatever route the caller supplies,
-    so a thief gains nothing by routing a sale through a pool of their
-    own: the output still has to clear the reference; a token with no
-    reference yet passes a sale on the floors alone.
+    per pool by the owner. On every sale the caller's minimum applies and,
+    where the token has a backstop, the wide band against it too, whatever
+    route the caller supplies, so a thief gains nothing by routing a sale
+    through a pool of their own; a token with no backstop passes a sale on
+    the caller's minimum and the floors.
   - **A swap checks the outcome, not the route.** The guard pulls exactly
     the input from its caller, the Safe, approves exactly that amount to a
     whitelisted router or aggregator, calls it with the calldata the
     caller supplies, and then requires that its own balance of the output
-    token grew by at least the minimum it derives from the reference price
-    less the band; everything that came back, output and unspent input,
+    token grew by at least the effective minimum (the caller's, or the
+    backstop's where that is larger); everything that came back, output
+    and unspent input,
     goes to the Safe, and anything short reverts. The route is the
     engine's business, so every AMM a whitelisted router reaches is
     tradable: Uniswap's Universal Router for v2, v3 and v4 (hooked pools
@@ -174,8 +197,9 @@ session notes):
     and a route that sends the output anywhere but the guard fails the
     check.
   - **A range open** mints a single-sided position whose range lies on the
-    correct side of the reference price and within a few tick spacings of
-    it, with the minimum equal to the amount offered (a range the price has
+    correct side of the pool's current price (and of the backstop's
+    time-weighted price, where the token has one) and within a few tick
+    spacings of it, with the minimum equal to the amount offered (a range the price has
     already entered reverts), the NFT to the Safe, on any
     concentrated-liquidity manager the registry whitelists: Uniswap v3's
     and its forks' position managers (Aerodrome Slipstream among them),
@@ -244,16 +268,30 @@ session notes):
     Safe could never ape a launch in time. The role may buy a token that is not on the whitelist,
     through the guard, under a per-period allowance stated in stablecoin
     terms through the pricing path, provided the pool is quoted in a
-    stablecoin or WETH and clears the absolute floor. This is the one
-    priced exit in the design, and it is shaped by the wrench attack: a
-    coerced buy of the attacker's coin in the attacker's pool is how the
-    role path would be made to pay out, so the absolute floor makes the
-    attacker show up with a pool holding real money (a capital barrier,
-    not a loss to them, since they take their liquidity back), and the
-    allowance is what a coercion yields per period, the number the owner
-    is prepared to lose with a wrench at their head. The time-weighted
-    price is no defence here, the attacker set it, and neither is the
-    Delay, which role calls bypass. Selling any token the Safe holds back
+    stablecoin or WETH and clears the absolute floor. **The same allowance
+    is withdrawable to any address with the home key alone (owner,
+    2026-11-09):** one bucket, spent either on buys of non-whitelisted
+    tokens inside the Safe or on a plain transfer out through the guard's
+    `withdrawAllowance(token, amount, to)`, one Rabby signature and no
+    other condition. The owner's reasoning: this is the one priced exit in
+    the design, the number the owner is prepared to lose with a wrench at
+    their head, and an attacker who has read the design knows it exists;
+    if the only way to pay it out were to stand up a pool and have the
+    victim buy the attacker's coin, the victim would look as if they were
+    stalling while doing something slow and technical, and would be hurt
+    for it. So the ceiling is easy to hand over: the runbook says pay it,
+    the published stories say what the ceiling is, and nothing else is
+    reachable. It also covers the degen activity the Safe can never host
+    (a new chain, an NFT, an exotic protocol): withdraw the allowance to a
+    hot wallet and go, and whatever comes back lands in the Safe like any
+    inbound transfer. **The window is rolling and equal to the owner
+    path's cooldown:** debits expire after one cooldown, so any window of
+    that length yields at most one allowance, with no double take at a
+    period boundary, and an attacker holding the owner for a full
+    cooldown gets one allowance or, with the vault key too, a delayed
+    withdrawal, never faster. The Delay does not apply to the allowance,
+    by design. The absolute floor still applies to a degen buy, which
+    needs a real pool; the withdrawal needs nothing but the bucket. Selling any token the Safe holds back
     into the reserve set is never capped and needs no whitelisting, since the
     approver grants the guard its approval at sale time. A token bought
     under the degen allowance stays on the degen path, re-buys included,
@@ -272,14 +310,16 @@ session notes):
     a young pool with no reference passes on the floors and the allowance.
   - **The registry holds the policy the guard reads (option B, owner,
     2026-11-05).** One contract per chain, owned by the funded Safe (so
-    two keys through the Delay, or three direct), holding: the whitelisted set,
-    and for every token the pool the guard trades it in; per pool, the
+    two keys through the Delay, or three direct), holding: the whitelisted set, and
+    for every token its backstop pool and kind, or none, and for a degen
+    token the pool of its first buy; per pool, the
     deviation band, the tick distance, the depth multiple, the absolute
     floor, the pricing path and the sell band, each with a default applied
-    at whitelisting; two running per-period notionals in stablecoin terms
-    through the pricing path, one for the whitelisted path and one for the
-    degen path, which the guard debits with the value of what is
-    **bought** on every swap and open; and a **pause flag** (owner,
+    at whitelisting; two running notionals in stablecoin terms through the pricing
+    path, rolling windows of the owner path's cooldown, one for the
+    whitelisted path, debited with the value of what is **bought** on
+    every swap and open, and one for the degen path, debited with every
+    non-whitelisted buy and every `withdrawAllowance`; and a **pause flag** (owner,
     2026-11-05): any role member sets it with a role call, at once, and
     the guard refuses every call while it is set; clearing it is the
     owner's, two keys through the Delay. It is what bounds a compromised
@@ -332,15 +372,14 @@ session notes):
     separates where it checks from where it trades. Execution is any
     whitelisted router with an outcome check, so no AMM is out of reach
     and a new one costs a router entry in the policy, not code. The
-    reference price needs a read adapter per pool kind, the small set
-    above, each a few dozen lines; a new kind is an adapter with its fork
-    tests, a two-key change. What the guard cannot do is conjure a
-    trustworthy price for a pool with no history: there the check is off,
-    by the owner's per-pool choice, and the floors and the notionals
-    bound the trade.
-  - **Cost:** custom Solidity in the trust path, the guard with its read
-    adapters, the registry with its snapshot store, and the approver,
-    together under a thousand lines, so an audit before real
+    backstop needs a read adapter per pool kind with a free oracle, three
+    in all, each a few dozen lines; kinds that need a keeper are deferred.
+    What the guard cannot do is conjure a trustworthy price for a pool
+    with no history: there the caller's minimum is the only price check,
+    and the floors and the notionals bound the trade.
+  - **Cost:** custom Solidity in the trust path, the guard with its three
+    read adapters, the registry and the approver, together a few hundred
+    lines, so an audit before real
     funds, and the fork suite testing their reverts as it tests the
     policy's. The time-weighted price is itself movable on
     a thin pool over several blocks, so the band is a cost imposed on a
@@ -616,7 +655,10 @@ session notes):
    through a hop under its floor reverts; a buy of a non-whitelisted token
    passes under the degen allowance in a young pool over the floor, and
    reverts above the allowance, under the floor, or quoted in another
-   non-whitelisted token), the registry and the whitelisting Delay (an add queued by
+   non-whitelisted token; a `withdrawAllowance` to any address passes
+   within the bucket and reverts above it, the bucket rolling over one
+   cooldown; a buy whose backstop pool is under the floor reverts; a buy
+   below the caller's minimum reverts), the registry and the whitelisting Delay (an add queued by
    the home key executes after the cooldown and not before; the vault key
    skips it; a home-key call that loosens a parameter or raises a notional
    reverts; a removal by the role is immediate), the approver (refuses any
@@ -664,8 +706,9 @@ session notes):
 - Under a wrench attack the home key alone can trade within the whitelists
   and move money between the owner's own addresses, the Safe's
   Hyperliquid account included. The one priced exit is
-  the degen allowance: a coerced buy of the attacker's token in a pool the
-  attacker has funded past the absolute floor, capped per period. A
+  the degen allowance, withdrawable to any address with the home key, one
+  allowance per cooldown window, which the owner hands over under duress
+  by design. A
   coerced whitelisting costs the attacker the cooldown with the owner in hand,
   visible on chain, and then at most the whitelisted path's per-period
   notional in a pool that clears the floors. It can send the book to the
@@ -673,7 +716,7 @@ session notes):
   withdrawals only to the bank or back to the Safes. It cannot send
   anything elsewhere.
 - **A stolen home key**, with no owner to coerce, takes the degen
-  allowance per day. The residuals, each accepted by the owner
+  allowance per cooldown window, by a plain withdrawal. The residuals, each accepted by the owner
   (2026-11-05): after the three-day whitelisting cooldown, the whitelisted path's
   per-period notional into a pool of the thief's own, unless the vault key
   skips the whitelisting first; and a sandwich of the Safe's

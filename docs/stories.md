@@ -36,13 +36,15 @@ the signer service. Agents never hold any key and never touch mainnet.
 
 4. **When I want to sell a token I hold, I can always do so at once with
    the home key.** Through the guard, with the approver granting the
-   approval at sale time; a wide band (30% by default) over a short window
-   against the pool's time-weighted price; the sale goes through the pool
-   the registry knows for the token, and a pool too young to have a
-   time-weighted price passes on that rule alone. Residual (accepted): a
-   crash faster than the window holds a sale back for at most the window;
-   a thief with the home key and the capital to move the pool can
-   sandwich the Safe's own sale for up to the band.
+   approval at sale time, through any whitelisted router; my own minimum,
+   shown before I sign, always applies, and where the token has a backstop
+   pool a wide band (30% by default) over a short window against its
+   time-weighted price applies too; a token with no backstop sells on my
+   minimum and the floors. Residual (accepted): a crash faster than the
+   window holds a sale back for at most the window; a thief with the home
+   key and the capital to move the pool can sandwich the Safe's own sale
+   for up to the band where there is a backstop, and for the position
+   where there is none.
 5. **When I want to buy a token I already bought in the past, I can do it
    at once with the home key.** A whitelisted token: the whitelisted path. A token
    bought under the degen allowance and never whitelisted: the degen path
@@ -51,13 +53,19 @@ the signer service. Agents never hold any key and never touch mainnet.
    the home key.** The whitelisted path, debiting the whitelisted notional with the
    value bought; buys of the reserve set (stablecoins, WETH) count for
    nothing. Residual: the whitelisted notional per period, set generously.
-7. **When I want to buy a new token, I can do so at once with the home key
-   up to a value per day; changing that allowance needs two keys plus the
-   delay.** The degen allowance in the registry, only in pools quoted in a
-   stablecoin or WETH that clear the absolute floor; the registry is owned
-   by the funded Safe, so the allowance changes through story 2's path.
-   Residual: the allowance per period is what a coercion or a theft
-   yields (story 9).
+7. **When I want to buy a new token, or move money out to any address for
+   a degen play, I can do so at once with the home key, up to the
+   allowance per window; changing the allowance needs two keys plus the
+   delay.** One bucket in the registry: buys of non-whitelisted tokens
+   inside the Safe (only in pools quoted in a stablecoin or WETH that
+   clear the absolute floor) and plain withdrawals to any address through
+   the guard, one signature, no other condition. The window is rolling and
+   equal to the owner path's cooldown, so any window of that length yields
+   at most one allowance. The registry is owned by the funded Safe, so the
+   allowance changes through story 2's path. Residual, by design: the
+   allowance per window is what a coercion or a theft yields (story 10),
+   and under duress I hand it over without stalling; it is the published
+   ceiling.
 8. **I can bridge any held token to my own Safe on another chain with the
    home key.** The guard's bridge: any token, whitelisted or not, the
    destination pinned to the Safe's own address on the other chain, no
@@ -72,8 +80,11 @@ the signer service. Agents never hold any key and never touch mainnet.
    from the app's UI, and it takes effect after a delay.** The app builds
    the call, the home Ledger signs it through Rabby, the whitelisting Delay
    holds it for three days, the app's worker executes it; the vault key
-   can skip it. A whitelisting applies default parameters; loosening them is
-   two-key through the delay; removal is immediate. Residual (accepted):
+   can skip it. A whitelisting applies default parameters and the backstop
+   pool the app proposed and I confirmed (the deepest pool with a free
+   oracle that clears the absolute floor, or none, and the screen says
+   which); loosening parameters or re-pointing the backstop is two-key
+   through the delay; removal is immediate. Residual (accepted):
    whoever holds the home key can whitelist a coin of their own and, after the
    cooldown, buy it on the whitelisted path up to that path's per-period
    notional, unless the whitelisting is skipped first (story 12).
@@ -81,7 +92,9 @@ the signer service. Agents never hold any key and never touch mainnet.
 ## Attack bounds
 
 10. **An attacker with the home key can take out the degen allowance once
-    per day and nothing else.** The role path has no exit: every swap,
+    per cooldown window, by a plain withdrawal, and nothing else.** That
+    is the published ceiling and it is easy to pay. The role path has no
+    other exit: every swap,
     open, bridge and Hyperliquid transfer delivers to the Safe's own
     address, approvals go only to the guard, and the one external
     destination, the owner's Kraken account (story 17), returns funds only
@@ -147,9 +160,18 @@ the signer service. Agents never hold any key and never touch mainnet.
     engine's; a new AMM is a router entry in the policy, a new pool kind a
     small read adapter with its fork tests. Range orders work on every
     concentrated-liquidity manager the policy whitelists, v4's included.
-    Residual: the price check is as good as the reference pool's history;
-    a pool with none trades on the floors and the notionals alone, by my
-    choice per pool.
+    Residual: my own minimum always applies; the on-chain backstop exists
+    only where the token's reference pool has a free oracle, and a token
+    without one trades on my minimum, the floors and the notionals alone.
+19. **Before I sign a trade, I see the amounts I expect to receive and the
+    tolerance, and the trade reverts if the Safe gets less.** The app
+    looks prices up, shows the amounts, and passes the minimum to the
+    guard, which enforces it on the outcome; Rabby's simulation shows the
+    Safe's balance changes and a clear-signing descriptor puts the input
+    and the minimum on the Ledger's screen. For the engine's own trades the
+    signer service verifies the minimum against its own price lookup.
+    Residual: a minimum is as honest as whoever sets it, which is why the
+    backstop exists for a stolen home key or a compromised signer.
 
 ## Operations
 
