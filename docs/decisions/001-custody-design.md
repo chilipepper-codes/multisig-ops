@@ -137,7 +137,18 @@ session notes):
     pool for the token, the effective minimum is the larger of the
     caller's and the one derived from that pool's time-weighted price less
     the band, read through a small adapter for the pool's kind, never a
-    spot price, which is what an attacker moves. Only kinds with a **free
+    spot price, which is what an attacker moves. The rate is composed
+    through the pricing path when the reference pool's quote is not the
+    trade's other token (owner's question, 2026-11-10): a coin whose
+    reference pool is quoted in a tokenized stock is priced as the coin's
+    time-weighted price in the stock times the stock's time-weighted price
+    in USDC from the stock's own reference pool, and so on to the trade's
+    input token, at most two hops, each hop a free-oracle pool of a
+    whitelisted token that clears its own depth floor; the route the
+    trade takes is still irrelevant, only the amounts in and out are
+    checked. A token whose path cannot be completed has no backstop, and
+    the whitelisting screen says so. The band applies to the composed
+    rate, so it is set per token with the hops in mind. Only kinds with a **free
     oracle**, a time-weighted price the pool maintains itself as part of
     its normal operation, are built: Uniswap v3 and its forks (Aerodrome
     Slipstream, PancakeSwap v3) through `observe`; Aerodrome and Velodrome
@@ -267,8 +278,11 @@ session notes):
     whitelisting one takes the home key and the cooldown, so without this the
     Safe could never ape a launch in time. The role may buy a token that is not on the whitelist,
     through the guard, under a per-period allowance stated in stablecoin
-    terms through the pricing path, provided the pool is quoted in a
-    stablecoin or WETH and clears the absolute floor. **The same allowance
+    terms through the pricing path, provided the pool is quoted in a token
+    with a pricing path (a stablecoin, WETH, or a whitelisted token that
+    reaches one in at most two hops; amended 2026-11-10, since the floor
+    and the bucket only need a valuation, not a reserve quote) and clears
+    the absolute floor. **The same allowance
     is withdrawable to any address with the home key alone (owner,
     2026-11-09):** one bucket, spent either on buys of non-whitelisted
     tokens inside the Safe or on a plain transfer out through the guard's
