@@ -22,8 +22,10 @@ the signer service. Agents never hold any key and never touch mainnet.
    between the three keys and the funds. Residual: none. A lost key
    leaves story 10.
 2. **Withdrawing to another address needs two keys plus a configurable
-   delay.** Two keys sign on the fundless 2-of-3 Safe, which queues on the
-   funded Safe's Delay; the cooldown passes; anyone executes. The Delay is
+   delay, three days by default.** Two keys sign on the fundless 2-of-3
+   Safe, which queues on the funded Safe's Delay; the cooldown passes;
+   anyone executes. The same cooldown sets the degen allowance's window
+   (story 7). The Delay is
    owned by the funded Safe, so shortening the cooldown or skipping an
    entry takes all three keys. Residual: a coercer who holds the owner
    through the whole cooldown, visible on chain (story 12).

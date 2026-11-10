@@ -8,8 +8,8 @@ the token registry behind a whitelisting Delay the home key alone can queue on,
 and the approver module; amended again 2026-11-05 after the owner's user
 stories (`docs/stories.md`, the spec this design is measured against):
 three owner keys, 3 of 3 direct and 2 of 3 through the Delay, a wide
-band on sales, the whitelisting attack accepted at a three-day cooldown, a
-pause flag; decided 2026-11-05 (owner): the Safe is the Hyperliquid
+band on sales, the whitelisting attack accepted at a three-day cooldown (both
+Delays configurable, three days by default), a pause flag; decided 2026-11-05 (owner): the Safe is the Hyperliquid
 account, validated on testnet before live funds, the native multi-sig out;
 nothing built yet. Solana is
 **proposed**, not decided (last section). Every "verify" line below is a
@@ -285,7 +285,8 @@ session notes):
     (a new chain, an NFT, an exotic protocol): withdraw the allowance to a
     hot wallet and go, and whatever comes back lands in the Safe like any
     inbound transfer. **The window is rolling and equal to the owner
-    path's cooldown:** the registry keeps each debit with its timestamp
+    path's cooldown** (three days by default, so the allowance is once per
+    three days until the cooldown is changed)**:** the registry keeps each debit with its timestamp
     and sums those younger than one cooldown, so a new debit passes only
     if the trailing sum stays under the allowance, and any window of that
     length yields at most one allowance, with no double take at a period
@@ -351,8 +352,9 @@ session notes):
   - **The whitelisting Delay: the home key alone can add a token, after a
     cooldown.** A Zodiac Delay modifier whose target is the registry and
     whose only module is the home Ledger's EOA. It can queue one thing,
-    an add with the default parameters; after the cooldown (**three days**,
-    the owner's number, 2026-11-05) anyone executes it. Loosening a pool's
+    an add with the default parameters; after the cooldown (configurable
+    by the Delay's owner; **three days by default**, the owner's number)
+    anyone executes it. Loosening a pool's
     parameters or raising a notional is two-key, as is any other policy
     change: otherwise a coercer would queue "whitelist my token, multiple
     zero". Removing a token is a role call, immediate, since narrowing is
@@ -466,7 +468,9 @@ session notes):
     three owners at threshold 2, is the module enabled on the funded
     Safe's Delay. Every non-role action — a withdrawal, a policy change, a
     notional raised, the pause cleared — is queued by two keys, waits the
-    cooldown (configurable; a day or two), and anyone executes it after.
+    cooldown (configurable by the Delay's owner, so by all three keys;
+    **three days by default**, owner, 2026-11-10), and anyone executes it
+    after.
     The Delay's owner is the funded Safe itself, so shortening the
     cooldown or skipping an entry takes all three keys. A coerced two-key
     withdrawal needs the attacker to hold the owner through the whole

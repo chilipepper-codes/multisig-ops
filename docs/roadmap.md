@@ -29,8 +29,9 @@ non-whitelisted buys or withdrawn to any address with the home key (the
 one priced exit, handed over under duress by design; owner, 2026-11-09); the token set, the
 per-pool parameters and the per-period notionals in a **registry** the
 guard reads, where the home key alone can add a token behind a **whitelisting
-Delay** owned by the vault key with a three-day cooldown (amended
-2026-11-05; the whitelisting attack accepted), an **approver** module that
+Delay** owned by the vault key (both Delays configurable by their owners,
+three days by default, owner 2026-11-10; the whitelisting attack
+accepted), an **approver** module that
 grants the guard its token approvals, deposits to the owner's Kraken
 account at an address the registry pins per chain (owner, 2026-11-06:
 Kraken's global settings lock makes it another vault of the owner's), a
