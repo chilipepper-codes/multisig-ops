@@ -330,12 +330,15 @@ session notes):
     whitelisting gives it the full path and a backstop. Not a priority
     (owner, 2026-11-09), built when convenient. The withdrawal needs
     nothing but the bucket. **The allowance is a registry parameter**
-    (owner, 2026-11-10): lowering it is the home key's alone, at once,
-    through a role of its own on the home Ledger rather than the trader
-    role, so that a compromised app key cannot zero the duress payout at
-    the one moment it matters (the registry refuses a value that is not
-    lower); raising it is two keys through the Delay. For the same reason
-    the pause stops trading but never `withdrawAllowance`. Selling any token the Safe holds back
+    (owner, 2026-11-10): lowering it is a trader-role call, at once, the
+    app key included (the registry refuses a value that is not lower);
+    raising it is two keys through the Delay. The owner's reasoning for
+    letting any role member lower it: a visible zero tells a wrench
+    attacker that nothing moves without the vault key and the delay, which
+    is legible and safe; the hazard to avoid is an allowance that is not
+    zero but cannot be paid. The pause follows the same logic: a
+    trader-role call that stops trading but never `withdrawAllowance`, so
+    that while the allowance is not zero it stays payable. Selling any token the Safe holds back
     into the reserve set is never capped and needs no whitelisting, since the
     approver grants the guard its approval at sale time. A token bought
     under the degen allowance stays on the degen path, re-buys included,
@@ -359,15 +362,18 @@ session notes):
     token the pool of its first buy; per pool, the
     deviation band, the tick distance, the depth multiple, the absolute
     floor, the pricing path and the sell band, each with a default applied
-    at whitelisting; two running notionals in stablecoin terms through the pricing
+    at whitelisting, the defaults set when the registry is deployed with
+    the Safe and changed, like every parameter of a whitelisted pool in
+    either direction, only by two keys through the Delay (owner,
+    2026-11-10, the bands in particular); two running notionals in stablecoin terms through the pricing
     path, rolling windows of the owner path's cooldown, one for the
     whitelisted path, debited with the value of what is **bought** on
     every swap and open, and one for the degen path, debited with every
     non-whitelisted buy and every `withdrawAllowance`; and a **pause flag** (owner,
     2026-11-05): any role member sets it with a role call, at once, and
     the guard refuses every call but `withdrawAllowance` while it is set
-    (the duress payout must survive a pause set by a compromised app;
-    owner, 2026-11-10); clearing it is the
+    (an allowance that is not zero must stay payable; owner,
+    2026-11-10); clearing it is the
     owner's, two keys through the Delay. It is what bounds a compromised
     app key the moment the owner notices, since removing a role member is
     a two-key change. Buys of the

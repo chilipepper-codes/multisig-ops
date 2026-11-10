@@ -57,8 +57,8 @@ the signer service. Agents never hold any key and never touch mainnet.
    nothing. Residual: the whitelisted notional per period, set generously.
 7. **When I want to buy a new token, or move money out to any address for
    a degen play, I can do so at once with the home key, up to the
-   allowance per window; lowering the allowance is mine alone with the
-   home key, at once; raising it needs two keys plus the delay.** One bucket in the registry: buys of non-whitelisted tokens
+   allowance per window; lowering the allowance is a one-key action for
+   the trader role, at once; raising it needs two keys plus the delay.** One bucket in the registry: buys of non-whitelisted tokens
    inside the Safe (only in pools quoted in a token with a pricing path
    that clear the absolute floor) and plain withdrawals to any address through
    the guard, one signature, no other condition. The window is rolling and
