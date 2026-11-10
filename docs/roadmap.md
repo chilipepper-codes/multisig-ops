@@ -79,10 +79,15 @@ any policy goes live; agents never hold a key, never touch mainnet.
    action confirmed through the precompiles, the node tracker's
    silent-failure report reproduced or ruled out; the refusals; a soak of
    weeks. Nothing on Hyperliquid goes live before this passes.
-5. **The KMS signer service** and the tracker's intent API, whose intents
-   include opening, reloading and closing a range order (a reload cycle is
-   one MultiSend role call); the executor's bad-trade residual bounded by
-   the registry's whitelisted set and notionals and the engine's checks.
+5. **The KMS signer service** (ADR-001, the app's key: its own allowlist
+   with the role call and MultiSend unwrapped, its caps and freeze set by
+   the owner outside the app, idempotency and nonce rules, one caller,
+   the check of every swap intent's minimum against prices it reads
+   itself, `withdrawAllowance` refused outright) and the tracker's intent
+   API, whose intents include opening, reloading and closing a range
+   order (a reload cycle is one MultiSend role call); the executor's
+   bad-trade residual bounded by the registry's whitelisted set and
+   notionals, the signer's checks and the engine's checks.
 6. **The audit** of the guard, the registry and the approver, its findings
    closed in the fork suite, before any real funds pass through them.
 7. **Monitoring** (owner, 2026-11-05: yes; its shape to be decided with
@@ -142,6 +147,11 @@ decided and another solution possible when the work is taken up:
   counting against the degen allowance for its first days, closing the
   whitelisting attack the owner accepted (ADR-001); a timestamp in the
   registry if ever wanted.
+- **A Ledger clear-signing descriptor** (ERC-7730) for the guard's calls,
+  accepted into Ledger's registry, so the hardware screen shows the input
+  and the minimum instead of a blind-signing hash; low priority, perhaps
+  only for a commercial launch (owner, 2026-11-10); until then Rabby's
+  simulation is the pre-sign defence.
 - **Scheduled policy drift checks**: the fork suite on a schedule against
   the live policy, since routers and protocols move.
 - **A wrench-attack and key-loss drill**: a written runbook and a dry run

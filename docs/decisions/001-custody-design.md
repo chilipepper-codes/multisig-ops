@@ -124,9 +124,13 @@ session notes):
     the primary check, and it is strong wherever the caller is honest:
     the owner signing through Rabby sees the amounts (Rabby's pre-sign
     simulation shows the Safe's balance changes, and a Ledger
-    clear-signing descriptor for the guard's calls, ERC-7730, puts the
-    input and the minimum on the hardware screen, which also defeats
-    malware rewriting calldata in the browser); for the engine's own
+    clear-signing descriptor for the guard's calls, ERC-7730, would put
+    the input and the minimum on the hardware screen, which also defeats
+    malware rewriting calldata in the browser, once Ledger's registry
+    accepts it; until then the Ledger shows a blind-signing hash, Rabby's
+    simulation is the pre-sign defence and the outcome check still catches
+    a tampered minimum on chain; low priority, back of the roadmap, owner
+    2026-11-10); for the engine's own
     trades the signer service, the separate process that holds the KMS
     grant, verifies every intent's minimum against its own independent
     price lookup and refuses to sign past the policy's slippage, so a
@@ -171,11 +175,23 @@ session notes):
     the degen path, under the allowance, until it has such a pool or
     until keepers are built; the whitelisted path therefore always has a
     backstop, and the stolen-key sandwich on it is bounded by the band
-    everywhere. Re-pointing is a parameter change, two keys
-    through the Delay, since pointing at a thin pool is a loosening; the
-    app alerts when a backstop pool's depth falls under the floor, and the
-    guard refuses a buy whose backstop pool no longer clears it until the
-    owner re-points, while a sale still goes through on the wide band.
+    everywhere. **Re-pointing** (owner, 2026-11-10): to a pool at least as
+    deep as the current one it goes through the whitelisting Delay like a
+    fresh whitelisting, the home key alone, the cooldown, the vault key's
+    skip, the registry checking at execution that the new pool is of a
+    supported kind, clears the floor and is at least as deep as the old
+    one in stable terms; to a thinner pool it is two keys through the
+    Delay. Never one key without a delay: the backstop defines the fair
+    price for a token whose positions sell uncapped, so a thief with the
+    home key who could re-point at once would fund a pool of their own
+    past the floor, grow its oracle, hold the price where they want it
+    for the window, re-point and sell the Safe's whole position into it;
+    the depth is their own capital, which they take back, and only time
+    and the veto stop it. The app alerts when a backstop pool's depth
+    falls under the floor, so the owner has the cooldown in hand; the
+    guard refuses a buy whose backstop pool no longer clears the floor
+    until the re-point executes, while a sale still goes through on the
+    wide band.
     Kinds that would need a keeper of ours (Uniswap v2 pairs through their
     cumulative accumulators against registry snapshots; Uniswap v4 pools
     through sampled observations by designated keepers) are **not built**:
@@ -295,7 +311,12 @@ session notes):
     2026-11-09):** one bucket, spent either on buys of non-whitelisted
     tokens inside the Safe or on a plain transfer out through the guard's
     `withdrawAllowance(token, amount, to)`, one Rabby signature and no
-    other condition. The owner's reasoning: this is the one priced exit in
+    other condition. **The withdrawal is the home key's alone** (owner,
+    2026-11-10, after the tracker session's review): it sits behind a
+    second role whose only member is the home Ledger, as the whitelisting
+    Delay does, and the signer refuses it whatever the role says, so the
+    app key has no ability to withdraw, which is requirement 3; the degen
+    buy inside the Safe stays a trader-role call. The owner's reasoning: this is the one priced exit in
     the design, the number the owner is prepared to lose with a wrench at
     their head, and an attacker who has read the design knows it exists;
     if the only way to pay it out were to stand up a pool and have the
@@ -434,7 +455,14 @@ session notes):
     read adapters, the registry and the approver, together a few hundred
     lines, so an audit before real
     funds, and the fork suite testing their reverts as it tests the
-    policy's. The time-weighted price is itself movable on
+    policy's. **Build notes for that audit** (the tracker session's
+    review, 2026-11-10): a reentrancy lock around the caller's calldata;
+    the router approval reset to zero after every call; native value
+    refused unless the route needs it; routers that pull through Permit2
+    (the Universal Router does) served by the guard granting Permit2 a
+    per-call allowance that expires with the block; the rolling window
+    kept as fixed hourly buckets, 72 per three-day window, so gas does not
+    grow with activity, at the cost of one hour of granularity. The time-weighted price is itself movable on
     a thin pool over several blocks, so the band is a cost imposed on a
     compromised engine, not a wall; with the depth floor that cost is what
     it takes to move a deep pool.
@@ -446,16 +474,23 @@ session notes):
   Kraken can only come back to the Safes or go to the bank. That makes a
   deposit to Kraken a transfer into another vault of the owner's, with a
   delay the owner configured rather than one of ours, and so a role call:
-  the one address outside the Safe system the role may send to. How: the
-  registry holds, per chain, the Kraken deposit address for the owner's
-  account, set and changed by two keys through the Delay, and the guard
-  gains a `sendToExchange` function that pulls a whitelisted token (the
-  approver grants the approval) and transfers it to that address, nothing
-  else; no price check and no cap, since the destination is the owner's.
-  Only on chains and for tokens Kraken accepts (USDC and ETH on Ethereum,
-  Arbitrum, Base, Optimism, Polygon at the time of writing; nothing on
-  Robinhood Chain, so those funds bridge to the Arbitrum Safe first); the
-  engine or the owner checks Kraken's current networks before each pin.
+  the one address outside the Safe system the role may send to, a
+  trader-role call, the app key included (owner, 2026-11-10: a deposit
+  to Kraken is recoverable, and the engine may want to make one). How:
+  the registry holds, per chain, the Kraken deposit address for the
+  owner's account, set and changed by two keys through the Delay, and a
+  **Kraken token list** per chain, USDC and ETH by default, extended by
+  the home key alone and at once, since its purpose is to stop a mistake
+  (a token Kraken does not accept on that chain is sent and never
+  credited) rather than a theft; the guard gains a `sendToExchange`
+  function that pulls a token on that list (the approver grants the
+  approval; WETH is unwrapped, since Kraken takes ETH as native on the
+  L2s) and transfers it to that address, nothing else; no price check and
+  no cap, since the destination is the owner's. Only on chains Kraken
+  accepts (USDC and ETH on Ethereum, Arbitrum, Base, Optimism, Polygon at
+  the time of writing; nothing on Robinhood Chain, so those funds bridge
+  to the Arbitrum Safe first); the engine or the owner checks Kraken's
+  current networks before each pin or list entry.
   Operational rules that carry the whole safety of this path: the lock
   stays on, with a long unlock wait; the destination allowlist at Kraken
   holds only the bank and the Safes; a pinned address is proved with a
@@ -658,8 +693,35 @@ session notes):
   price a flash swap could move a thin pool to, in one bundle (a swap with
   no trusted minimum output, or a single-sided open just beyond the moved
   price); with it, a bad trade costs the attacker what it takes to move a
-  deep pool's time-weighted price out of the band. Never a seed in the
+    deep pool's time-weighted price out of the band. Never a seed in the
   app.
+- **The signer service** (build step 5; the tracker's ADR-014 states the
+  contract the engine relies on). The engine never signs: it sends the
+  signer an intent (chain, account, target, calldata, value, gas, fees,
+  nonce, attempt id) and gets back a signed transaction or a refusal. The
+  signer is a separate process in this repository, the only holder of
+  the KMS sign grant, and the second line behind the executor, the
+  process most likely to be buggy or compromised. Its responsibilities:
+  its own allowlist of targets, selectors, tokens and size per intent,
+  which for role calls means unwrapping `execTransactionWithRole` and
+  the MultiSend inside it; its own running caps per window and per
+  token, set by the owner outside the app; its own freeze, set by the
+  owner outside the app; idempotency on the attempt id and the
+  nonce-replacement rules; one authenticated caller, the executor's
+  service account; every signature in KMS's audit log; and, since
+  2026-11-09, **a check of the minimum in every swap intent against a
+  price it obtains itself**: it reads the same on-chain time-weighted
+  prices and pool quotes the guard reads, through its own RPC, so
+  "independent" means independent of the executor's process, not a
+  second pricing stack. For a whitelisted token a price always exists,
+  since whitelisting requires a backstop pool; for a degen token the
+  bucket is the bound, so the signer accepts an intent within the bucket
+  and refuses one beyond it. The slippage it enforces is a signer-side
+  setting the owner changes outside the app, like its caps and freeze.
+  It refuses `withdrawAllowance` outright, whatever the role says. The
+  app predicts a refusal before arming an order and says so, since a
+  signer refusal is the one block the app's own warnings cannot
+  override. The owner's own trades through Rabby never touch the signer.
 
 ### Boundaries and rules
 

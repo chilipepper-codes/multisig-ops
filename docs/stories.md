@@ -60,8 +60,10 @@ the signer service. Agents never hold any key and never touch mainnet.
    allowance per window; lowering the allowance is a one-key action for
    the trader role, at once; raising it needs two keys plus the delay.** One bucket in the registry: buys of non-whitelisted tokens
    inside the Safe (only in pools quoted in a token with a pricing path
-   that clear the absolute floor) and plain withdrawals to any address through
-   the guard, one signature, no other condition. The window is rolling and
+   that clear the absolute floor), a trader-role call, and plain withdrawals to
+   any address through the guard, one signature, no other condition, the
+   home key's alone through a role of its own, which the app key is not
+   in and the signer refuses outright. The window is rolling and
    equal to the owner path's cooldown, so any window of that length yields
    at most one allowance. The registry is owned by the funded Safe, so the
    allowance changes through story 2's path. Residual, by design: the
@@ -87,8 +89,10 @@ the signer service. Agents never hold any key and never touch mainnet.
    oracle that clears the absolute floor; a token with no such pool
    cannot be whitelisted and stays under the degen allowance, and the
    registry checks the pool on chain when the whitelisting executes;
-   loosening parameters or re-pointing the backstop is two-key through
-   the delay; removal is immediate. Residual (accepted):
+   re-pointing the backstop to a pool at least as deep goes through the
+   same delay with the home key, checked on chain at execution; loosening
+   parameters or pointing at a thinner pool is two-key through the delay;
+   removal is immediate. Residual (accepted):
    whoever holds the home key can whitelist a coin of their own and, after the
    cooldown, buy it on the whitelisted path up to that path's per-period
    notional, unless the whitelisting is skipped first (story 12).
@@ -146,10 +150,12 @@ the signer service. Agents never hold any key and never touch mainnet.
 
 ## Exchange
 
-17. **I can deposit to my Kraken account with the home key alone.** The
-    guard's `sendToExchange` transfers a whitelisted token to the Kraken
-    deposit address the registry pins for that chain, set by two keys
-    through the delay; no cap, since Kraken's global settings lock is on
+17. **I can deposit to my Kraken account with the home key alone, and so
+    can the app.** The guard's `sendToExchange` transfers a token on the
+    registry's Kraken list for that chain (USDC and ETH by default,
+    extended by the home key at once, to stop a mistake rather than a
+    theft) to the Kraken deposit address the registry pins for that
+    chain, set by two keys through the delay; no cap, since Kraken's global settings lock is on
     and the account's withdrawal destinations are only my bank and the
     Safes, so a deposit is a move into another vault of mine. Only on
     chains and for tokens Kraken accepts. Residual: the path is as safe as
@@ -174,9 +180,11 @@ the signer service. Agents never hold any key and never touch mainnet.
     tolerance, and the trade reverts if the Safe gets less.** The app
     looks prices up, shows the amounts, and passes the minimum to the
     guard, which enforces it on the outcome; Rabby's simulation shows the
-    Safe's balance changes and a clear-signing descriptor puts the input
-    and the minimum on the Ledger's screen. For the engine's own trades the
-    signer service verifies the minimum against its own price lookup.
+    Safe's balance changes, and a clear-signing descriptor would put the
+    input and the minimum on the Ledger's screen once Ledger's registry
+    accepts it (low priority). For the engine's own trades the signer
+    service verifies the minimum against prices it reads itself on chain,
+    and the app predicts a refusal before arming.
     Residual: a minimum is as honest as whoever sets it, which is why the
     backstop exists for a stolen home key or a compromised signer.
 
