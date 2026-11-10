@@ -89,10 +89,11 @@ the signer service. Agents never hold any key and never touch mainnet.
    oracle that clears the absolute floor; a token with no such pool
    cannot be whitelisted and stays under the degen allowance, and the
    registry checks the pool on chain when the whitelisting executes;
-   re-pointing the backstop to a pool at least as deep goes through the
-   same delay with the home key, checked on chain at execution; loosening
-   parameters or pointing at a thinner pool is two-key through the delay;
-   removal is immediate. Residual (accepted):
+   re-pointing the backstop is mine with the home key after a short
+   delay (a per-chain parameter, one hour by default), the registry
+   checking on chain that the new pool is of a supported kind, at least
+   as deep as the old one and priced within the band of it; loosening
+   parameters is two-key through the delay; removal is immediate. Residual (accepted):
    whoever holds the home key can whitelist a coin of their own and, after the
    cooldown, buy it on the whitelisted path up to that path's per-period
    notional, unless the whitelisting is skipped first (story 12).
@@ -121,8 +122,8 @@ the signer service. Agents never hold any key and never touch mainnet.
 
 ## Hyperliquid
 
-13. **I can deposit to Hyperliquid with the home key, with no hop and no
-    cap.** The Safe itself is the Hyperliquid account: the same Safe at
+13. **I can deposit to Hyperliquid with the home key, with no hop, under
+    an allowance per window.** The Safe itself is the Hyperliquid account: the same Safe at
     the same address on HyperEVM, where the whole Zodiac stack is
     deployed, controls its HyperCore account through CoreWriter, scoped
     by Roles with no custom code. A deposit is a CCTP burn from the
@@ -130,8 +131,12 @@ the signer service. Agents never hold any key and never touch mainnet.
     calldata (or a native-bridge deposit, credited to the sender), so it
     is a transfer between the owner's own addresses. Decided 2026-11-05,
     validated thoroughly on testnet before any live funds (ADR-001,
-    Hyperliquid). Residual: none on the deposit itself; story 14 carries
-    the account's exposure.
+    Hyperliquid). The deposit allowance has the same window and controls
+    as the degen one, because Hyperliquid trading has no guard: on a thin
+    market a sale into a bid the attacker placed from their own account
+    would turn the balance into an exit, under a wrench or a remote
+    compromise alike. Residual: the Hyperliquid balance plus one allowance
+    per window; story 14 carries the account's exposure.
 14. **Trading on Hyperliquid needs no owner key; withdrawing back to my
     wallet needs the home key alone; leaving the Safe system needs two
     keys plus the delay.** API wallets (the owner's browser agent, the

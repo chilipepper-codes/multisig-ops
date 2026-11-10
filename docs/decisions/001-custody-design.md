@@ -175,23 +175,29 @@ session notes):
     the degen path, under the allowance, until it has such a pool or
     until keepers are built; the whitelisted path therefore always has a
     backstop, and the stolen-key sandwich on it is bounded by the band
-    everywhere. **Re-pointing** (owner, 2026-11-10): to a pool at least as
-    deep as the current one it goes through the whitelisting Delay like a
-    fresh whitelisting, the home key alone, the cooldown, the vault key's
-    skip, the registry checking at execution that the new pool is of a
-    supported kind, clears the floor and is at least as deep as the old
-    one in stable terms; to a thinner pool it is two keys through the
-    Delay. Never one key without a delay: the backstop defines the fair
-    price for a token whose positions sell uncapped, so a thief with the
-    home key who could re-point at once would fund a pool of their own
-    past the floor, grow its oracle, hold the price where they want it
-    for the window, re-point and sell the Safe's whole position into it;
-    the depth is their own capital, which they take back, and only time
-    and the veto stop it. The app alerts when a backstop pool's depth
-    falls under the floor, so the owner has the cooldown in hand; the
-    guard refuses a buy whose backstop pool no longer clears the floor
-    until the re-point executes, while a sale still goes through on the
-    wide band.
+    everywhere. **Re-pointing** (owner, 2026-11-10): one key, the home
+    key, with a delay that is a per-chain parameter, one hour by default,
+    and three checks the registry makes on chain when the re-point
+    activates: the new pool is of a supported kind; its depth is at least
+    the floor and at least the old pool's, in stable terms; and its
+    time-weighted price is within the band of the old backstop's, so a
+    re-point cannot move the reference price in one step. The delay, not
+    two keys, because the attack a re-point invites fails on its own on a
+    chain with arbitrage bots: a pool of the attacker's own, funded past
+    the floor with the price where they want it, is drained by the bots
+    within blocks, its time-weighted price ends up honest over any window,
+    and the attacker's capital goes to the bots, not to them; bundling
+    does not help, since the window itself takes longer than a bundle.
+    The hour is for the new pool to have a history before its price means
+    anything and for the depth alert to reach the owner. The residual,
+    accepted: once the new pool is active, an attacker who owns its
+    liquidity can withdraw it and then drag a thin pool's price over a
+    window; the depth alert, the pause and the bots answer it, and the
+    per-chain delay is the lever if a chain turns out to have no bots. The
+    app alerts when a backstop pool's depth falls under the floor, so the
+    owner has the hour in hand; the guard refuses a buy whose backstop
+    pool no longer clears the floor until the re-point activates, while a
+    sale still goes through on the wide band.
     Kinds that would need a keeper of ours (Uniswap v2 pairs through their
     cumulative accumulators against registry snapshots; Uniswap v4 pools
     through sampled observations by designated keepers) are **not built**:
@@ -460,9 +466,11 @@ session notes):
     the router approval reset to zero after every call; native value
     refused unless the route needs it; routers that pull through Permit2
     (the Universal Router does) served by the guard granting Permit2 a
-    per-call allowance that expires with the block; the rolling window
-    kept as fixed hourly buckets, 72 per three-day window, so gas does not
-    grow with activity, at the cost of one hour of granularity. The time-weighted price is itself movable on
+    per-call allowance that expires with the block; the rolling windows
+    kept as hourly buckets with a running total and lazy expiry (each call
+    expires the buckets that aged out and adjusts the total), so a call
+    reads a handful of slots whatever the bucket size, and the hour costs
+    nothing over a coarser bucket (owner's question, 2026-11-10). The time-weighted price is itself movable on
     a thin pool over several blocks, so the band is a cost imposed on a
     compromised engine, not a wall; with the depth floor that cost is what
     it takes to move a deep pool.
@@ -617,7 +625,20 @@ session notes):
   withdraw by Hyperliquid's own rules; the engine signs orders with the
   KMS key off-chain exactly as before.
 - **Deposits are role calls with the destination in the signed calldata**,
-  never a transfer to an address that is not the Safe's own. Best first:
+  never a transfer to an address that is not the Safe's own, **under a
+  Hyperliquid deposit allowance per window** (owner, 2026-11-10). The
+  allowance exists because Hyperliquid trading has no guard: a market
+  sell on a thin book (the HIP-3 perps, most spot tokens) fills against
+  whatever bid is there, and a bid placed by the attacker's own account
+  turns the Safe's Hyperliquid balance into an exit, under a wrench
+  (the owner made to deposit and trade) and under a remote compromise of
+  the executor alike; on a liquid perp a market order walks the book
+  first, so the loss goes to other traders, which is why the thin markets
+  are the ones that matter. With the allowance the bound in both cases is
+  the Hyperliquid balance plus one allowance per window. Same bookkeeping
+  and controls as the degen allowance: a rolling window equal to the owner
+  path's cooldown, lowering a trader-role call, raising two keys through
+  the Delay; withdrawals back to the Safe uncapped. Rails, best first:
   (1) **CCTP v2 with Circle's forwarder**: one transaction from the
   Arbitrum Safe, `depositForBurnWithHook` with the mint recipient and
   destination caller pinned to Circle's forwarder on HyperEVM and the
@@ -695,33 +716,41 @@ session notes):
   price); with it, a bad trade costs the attacker what it takes to move a
     deep pool's time-weighted price out of the band. Never a seed in the
   app.
-- **The signer service** (build step 5; the tracker's ADR-014 states the
-  contract the engine relies on). The engine never signs: it sends the
-  signer an intent (chain, account, target, calldata, value, gas, fees,
-  nonce, attempt id) and gets back a signed transaction or a refusal. The
-  signer is a separate process in this repository, the only holder of
-  the KMS sign grant, and the second line behind the executor, the
-  process most likely to be buggy or compromised. Its responsibilities:
-  its own allowlist of targets, selectors, tokens and size per intent,
-  which for role calls means unwrapping `execTransactionWithRole` and
-  the MultiSend inside it; its own running caps per window and per
-  token, set by the owner outside the app; its own freeze, set by the
-  owner outside the app; idempotency on the attempt id and the
-  nonce-replacement rules; one authenticated caller, the executor's
-  service account; every signature in KMS's audit log; and, since
-  2026-11-09, **a check of the minimum in every swap intent against a
-  price it obtains itself**: it reads the same on-chain time-weighted
-  prices and pool quotes the guard reads, through its own RPC, so
-  "independent" means independent of the executor's process, not a
-  second pricing stack. For a whitelisted token a price always exists,
-  since whitelisting requires a backstop pool; for a degen token the
-  bucket is the bound, so the signer accepts an intent within the bucket
-  and refuses one beyond it. The slippage it enforces is a signer-side
-  setting the owner changes outside the app, like its caps and freeze.
-  It refuses `withdrawAllowance` outright, whatever the role says. The
-  app predicts a refusal before arming an order and says so, since a
-  signer refusal is the one block the app's own warnings cannot
-  override. The owner's own trades through Rabby never touch the signer.
+- **The signer service** (build step 5; slimmed 2026-11-10 after the
+  owner's question of what it buys over the chain's own checks). The
+  engine never signs: it sends the signer an intent (chain, account,
+  target, calldata, value, gas, fees, nonce, attempt id) and gets back a
+  signed transaction or a refusal. The signer is a separate process in
+  this repository and the only identity with permission to ask Cloud KMS
+  to sign. Its EVM-side checks of the first draft (an allowlist, caps, a
+  price check) duplicated Roles, the registry's notionals and the guard's
+  backstop and are dropped: on EVM the chain is the policy. What it keeps,
+  because nothing else can do it: **never send twice**, one nonce per
+  attempt, a replacement only at the same nonce with higher fees, the
+  same intent returning the same signature, since the process that holds
+  the key is the right place to stop a retrying executor from double
+  sending; **`withdrawAllowance` refused outright**, whatever the role
+  says; and **the order policy for venues with no on-chain guard**,
+  Hyperliquid first: price within a band of the mark or oracle price,
+  size caps per order and per window, a market allowlist, reduce-only
+  rules, which is what bounds a remote compromise of the executor on
+  Hyperliquid, and later Solana. **The freeze needs no feature:** the
+  signer can sign only because its service account holds one IAM
+  permission on the KMS key, and the owner, with a cloud identity the app
+  never has, can revoke that permission or disable the key version from
+  the console in seconds, stopping every signature the app's key could
+  make on every chain and on Hyperliquid, reversibly; it is a runbook
+  entry, the off-chain and instant counterpart of the on-chain pause.
+  **The key cannot be extracted** by anyone: Cloud KMS keeps it in a
+  hardware security module and signs on request, so what exists outside
+  is a permission to ask; under a wrench the owner can be made to ask,
+  which is why the deposit allowances, not the signer's policy, are the
+  bound in that case, and the policy bounds the remote case. Optional
+  hardening, in the roadmap's ideas: run the signer in Confidential Space
+  and bind the KMS permission to the attested container image, so that
+  even the project's own cloud credentials cannot call the key from
+  anywhere else. The owner's own trades through Rabby never touch the
+  signer.
 
 ### Boundaries and rules
 

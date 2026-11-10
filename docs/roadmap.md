@@ -79,11 +79,12 @@ any policy goes live; agents never hold a key, never touch mainnet.
    action confirmed through the precompiles, the node tracker's
    silent-failure report reproduced or ruled out; the refusals; a soak of
    weeks. Nothing on Hyperliquid goes live before this passes.
-5. **The KMS signer service** (ADR-001, the app's key: its own allowlist
-   with the role call and MultiSend unwrapped, its caps and freeze set by
-   the owner outside the app, idempotency and nonce rules, one caller,
-   the check of every swap intent's minimum against prices it reads
-   itself, `withdrawAllowance` refused outright) and the tracker's intent
+5. **The KMS signer service** (ADR-001, the app's key, slimmed
+   2026-11-10: the only identity that can ask KMS to sign; never send
+   twice; `withdrawAllowance` refused outright; the order policy for
+   Hyperliquid, which has no on-chain guard; the freeze as a runbook
+   entry, revoking the KMS permission; no EVM allowlist, caps or price
+   check, since the chain is the policy there) and the tracker's intent
    API, whose intents include opening, reloading and closing a range
    order (a reload cycle is one MultiSend role call); the executor's
    bad-trade residual bounded by the registry's whitelisted set and
@@ -147,6 +148,10 @@ decided and another solution possible when the work is taken up:
   counting against the degen allowance for its first days, closing the
   whitelisting attack the owner accepted (ADR-001); a timestamp in the
   registry if ever wanted.
+- **The signer in Confidential Space**, with the KMS permission bound to
+  the attested container image, so that even the project's own cloud
+  credentials cannot call the key from anywhere else; hardening, not
+  needed for version one (owner's question, 2026-11-10).
 - **A Ledger clear-signing descriptor** (ERC-7730) for the guard's calls,
   accepted into Ledger's registry, so the hardware screen shows the input
   and the minimum instead of a blind-signing hash; low priority, perhaps
