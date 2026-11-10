@@ -146,8 +146,8 @@ session notes):
     input token, at most two hops, each hop a free-oracle pool of a
     whitelisted token that clears its own depth floor; the route the
     trade takes is still irrelevant, only the amounts in and out are
-    checked. A token whose path cannot be completed has no backstop, and
-    the whitelisting screen says so. The band applies to the composed
+    checked. A token whose path cannot be completed cannot be whitelisted
+    (next sentence). The band applies to the composed
     rate, so it is set per token with the hops in mind. Only kinds with a **free
     oracle**, a time-weighted price the pool maintains itself as part of
     its normal operation, are built: Uniswap v3 and its forks (Aerodrome
@@ -162,8 +162,16 @@ session notes):
     clears the absolute floor; the owner confirms it in the whitelisting
     screen, and the pool and its kind are written into the registry entry
     with the whitelisting itself, so the home key sets it after the
-    cooldown. A token with no such pool is whitelisted without a backstop,
-    and the screen says so. Re-pointing is a parameter change, two keys
+    cooldown. **A token with no such pool cannot be whitelisted** (owner,
+    2026-11-10): while the only adapters are the free-oracle kinds, a
+    whitelisting must carry a backstop pool of a supported kind that
+    clears the absolute floor, and the registry's add checks both on
+    chain when the Delay executes it, so even a coerced whitelisting
+    cannot point at a thin or unsupported pool. Everything else stays on
+    the degen path, under the allowance, until it has such a pool or
+    until keepers are built; the whitelisted path therefore always has a
+    backstop, and the stolen-key sandwich on it is bounded by the band
+    everywhere. Re-pointing is a parameter change, two keys
     through the Delay, since pointing at a thin pool is a loosening; the
     app alerts when a backstop pool's depth falls under the floor, and the
     guard refuses a buy whose backstop pool no longer clears it until the
@@ -189,8 +197,8 @@ session notes):
     per pool by the owner. On every sale the caller's minimum applies and,
     where the token has a backstop, the wide band against it too, whatever
     route the caller supplies, so a thief gains nothing by routing a sale
-    through a pool of their own; a token with no backstop passes a sale on
-    the caller's minimum and the floors.
+    through a pool of their own; a degen token, which has no backstop,
+    passes a sale on the caller's minimum and the floors.
   - **A swap checks the outcome, not the route.** The guard pulls exactly
     the input from its caller, the Safe, approves exactly that amount to a
     whitelisted router or aggregator, calls it with the calldata the
@@ -321,7 +329,13 @@ session notes):
     custody: the position sits in the Safe from day one, and a later
     whitelisting gives it the full path and a backstop. Not a priority
     (owner, 2026-11-09), built when convenient. The withdrawal needs
-    nothing but the bucket. Selling any token the Safe holds back
+    nothing but the bucket. **The allowance is a registry parameter**
+    (owner, 2026-11-10): lowering it is the home key's alone, at once,
+    through a role of its own on the home Ledger rather than the trader
+    role, so that a compromised app key cannot zero the duress payout at
+    the one moment it matters (the registry refuses a value that is not
+    lower); raising it is two keys through the Delay. For the same reason
+    the pause stops trading but never `withdrawAllowance`. Selling any token the Safe holds back
     into the reserve set is never capped and needs no whitelisting, since the
     approver grants the guard its approval at sale time. A token bought
     under the degen allowance stays on the degen path, re-buys included,
@@ -351,7 +365,9 @@ session notes):
     every swap and open, and one for the degen path, debited with every
     non-whitelisted buy and every `withdrawAllowance`; and a **pause flag** (owner,
     2026-11-05): any role member sets it with a role call, at once, and
-    the guard refuses every call while it is set; clearing it is the
+    the guard refuses every call but `withdrawAllowance` while it is set
+    (the duress payout must survive a pause set by a compromised app;
+    owner, 2026-11-10); clearing it is the
     owner's, two keys through the Delay. It is what bounds a compromised
     app key the moment the owner notices, since removing a role member is
     a two-key change. Buys of the

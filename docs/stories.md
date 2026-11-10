@@ -41,8 +41,8 @@ the signer service. Agents never hold any key and never touch mainnet.
    approval at sale time, through any whitelisted router; my own minimum,
    shown before I sign, always applies, and where the token has a backstop
    pool a wide band (30% by default) over a short window against its
-   time-weighted price applies too; a token with no backstop sells on my
-   minimum and the floors. Residual (accepted): a crash faster than the
+   time-weighted price applies too; a degen token, which has no backstop,
+   sells on my minimum and the floors. Residual (accepted): a crash faster than the
    window holds a sale back for at most the window; a thief with the home
    key and the capital to move the pool can sandwich the Safe's own sale
    for up to the band where there is a backstop, and for the position
@@ -57,8 +57,8 @@ the signer service. Agents never hold any key and never touch mainnet.
    nothing. Residual: the whitelisted notional per period, set generously.
 7. **When I want to buy a new token, or move money out to any address for
    a degen play, I can do so at once with the home key, up to the
-   allowance per window; changing the allowance needs two keys plus the
-   delay.** One bucket in the registry: buys of non-whitelisted tokens
+   allowance per window; lowering the allowance is mine alone with the
+   home key, at once; raising it needs two keys plus the delay.** One bucket in the registry: buys of non-whitelisted tokens
    inside the Safe (only in pools quoted in a token with a pricing path
    that clear the absolute floor) and plain withdrawals to any address through
    the guard, one signature, no other condition. The window is rolling and
@@ -83,10 +83,12 @@ the signer service. Agents never hold any key and never touch mainnet.
    the call, the home Ledger signs it through Rabby, the whitelisting Delay
    holds it for three days, the app's worker executes it; the vault key
    can skip it. A whitelisting applies default parameters and the backstop
-   pool the app proposed and I confirmed (the deepest pool with a free
-   oracle that clears the absolute floor, or none, and the screen says
-   which); loosening parameters or re-pointing the backstop is two-key
-   through the delay; removal is immediate. Residual (accepted):
+   pool the app proposed and I confirmed, the deepest pool with a free
+   oracle that clears the absolute floor; a token with no such pool
+   cannot be whitelisted and stays under the degen allowance, and the
+   registry checks the pool on chain when the whitelisting executes;
+   loosening parameters or re-pointing the backstop is two-key through
+   the delay; removal is immediate. Residual (accepted):
    whoever holds the home key can whitelist a coin of their own and, after the
    cooldown, buy it on the whitelisted path up to that path's per-period
    notional, unless the whitelisting is skipped first (story 12).
@@ -106,7 +108,9 @@ the signer service. Agents never hold any key and never touch mainnet.
 11. **I can halt all trading at once with the home key; resuming needs two
     keys plus the delay.** The registry's pause flag, set by any role
     member, cleared through story 2's path. The guard refuses every call
-    while it is set. Residual: none.
+    while it is set except the allowance withdrawal (story 7), so a pause
+    set by a compromised app cannot block the duress payout. Residual:
+    none.
 12. **I hear within minutes of any whitelisting queued, any Delay entry and any
     trade I did not make.** The monitoring step of the roadmap; its shape
     is to be decided with the owner. Stories 2, 9 and 10 depend on it.
@@ -162,9 +166,10 @@ the signer service. Agents never hold any key and never touch mainnet.
     engine's; a new AMM is a router entry in the policy, a new pool kind a
     small read adapter with its fork tests. Range orders work on every
     concentrated-liquidity manager the policy whitelists, v4's included.
-    Residual: my own minimum always applies; the on-chain backstop exists
-    only where the token's reference pool has a free oracle, and a token
-    without one trades on my minimum, the floors and the notionals alone.
+    Residual: my own minimum always applies; a whitelisted token always
+    has a backstop, since whitelisting requires a reference pool with a
+    free oracle; a token without one stays on the degen path and trades
+    on my minimum, the floors and the allowance alone.
 19. **Before I sign a trade, I see the amounts I expect to receive and the
     tolerance, and the trade reverts if the Safe gets less.** The app
     looks prices up, shows the amounts, and passes the minimum to the

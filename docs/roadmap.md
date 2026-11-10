@@ -134,7 +134,8 @@ decided and another solution possible when the work is taken up:
   (ADR-001).
 - **Keepers for reference prices without a free oracle** (owner,
   2026-11-09: only if practice shows tokens of interest with no
-  free-oracle pool): Uniswap v2 pairs through their cumulative
+  free-oracle pool; until then such tokens cannot be whitelisted and stay
+  under the degen allowance, owner 2026-11-10): Uniswap v2 pairs through their cumulative
   accumulators against registry snapshots, Uniswap v4 pools through
   sampled observations by designated keepers (ADR-001, the guard).
 - **Probation for new whitelistings**: a token whitelisted from the home key keeps
