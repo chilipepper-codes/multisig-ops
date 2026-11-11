@@ -91,9 +91,10 @@ the signer service. Agents never hold any key and never touch mainnet.
    registry checks the pool on chain when the whitelisting executes;
    re-pointing the backstop is mine with the home key after a short
    delay (a per-chain parameter, one hour by default), the registry
-   checking on chain that the new pool is of a supported kind, at least
-   as deep as the old one and priced within the band of it; loosening
-   parameters is two-key through the delay; removal is immediate. Residual (accepted):
+   checking on chain that the new pool holds the token against a priceable
+   quote, clears the depth floor and has a full window of oracle history;
+   loosening parameters is two-key through the delay; removal is
+   immediate. Residual (accepted):
    whoever holds the home key can whitelist a coin of their own and, after the
    cooldown, buy it on the whitelisted path up to that path's per-period
    notional, unless the whitelisting is skipped first (story 12).

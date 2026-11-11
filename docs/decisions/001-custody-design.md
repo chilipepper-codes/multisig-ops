@@ -175,34 +175,37 @@ session notes):
     the degen path, under the allowance, until it has such a pool or
     until keepers are built; the whitelisted path therefore always has a
     backstop, and the stolen-key sandwich on it is bounded by the band
-    everywhere. **Re-pointing** (owner, 2026-11-10): one key, the home
-    key, with a delay that is a per-chain parameter, one hour by default,
-    and three checks the registry makes on chain when the re-point
-    activates: the new pool is of a supported kind; its depth is at least
-    the floor and at least the old pool's, in stable terms; and its
-    time-weighted price is within the band of the old backstop's, so a
-    re-point cannot move the reference price in one step. When the old
-    pool is what broke, drained or dragged, that last check can refuse an
-    honest deeper pool; buys of the token then stay refused and the
-    fallback is the two-key re-point through the Delay, which skips the
-    continuity check, so it is named here rather than discovered under
-    pressure (the tracker session's review, 2026-11-11). The delay, not
-    two keys, because the attack a re-point invites fails on its own on a
-    chain with arbitrage bots: a pool of the attacker's own, funded past
-    the floor with the price where they want it, is drained by the bots
-    within blocks, its time-weighted price ends up honest over any window,
-    and the attacker's capital goes to the bots, not to them; bundling
-    does not help, since the window itself takes longer than a bundle.
-    The hour is for the new pool to have a history before its price means
-    anything and for the depth alert to reach the owner. The residual,
-    accepted: once the new pool is active, an attacker who owns its
-    liquidity can withdraw it and then drag a thin pool's price over a
-    window; the depth alert, the pause and the bots answer it, and the
-    per-chain delay is the lever if a chain turns out to have no bots. The
-    app alerts when a backstop pool's depth falls under the floor, so the
-    owner has the hour in hand; the guard refuses a buy whose backstop
-    pool no longer clears the floor until the re-point activates, while a
-    sale still goes through on the wide band.
+    everywhere. **Re-pointing** (owner, 2026-11-10 and 2026-11-11): one
+    path for every case, the home key alone, after a delay that is a
+    per-chain parameter, one hour by default, with three checks the
+    registry makes on chain when the re-point activates: the pool holds
+    the whitelisted token against a quote with a pricing path; its depth
+    clears the absolute floor in stable terms; and its oracle answers for
+    a full window, which is the on-chain form of an hour of existence. No
+    continuity check against the old backstop's price and no comparison
+    with the old pool's depth: two liquid pools of the same token on the
+    same chain cannot sit far apart, since arbitrage bots close any gap
+    within blocks, so a continuity check adds nothing when both pools are
+    liquid and refuses the honest fix in the one case it would bite, an
+    old pool that broke; and a thinner pool that still clears the floor is
+    a legitimate destination when the old one thinned, which is the usual
+    reason to re-point. The delay, not two keys, because the attack a
+    re-point invites fails on its own on a chain with bots: a pool of the
+    attacker's own, funded past the floor with the price where they want
+    it, is drained by the bots within blocks, its time-weighted price ends
+    up honest over any window, and the attacker's capital goes to the
+    bots, not to them; bundling does not help, since the window itself
+    takes longer than a bundle. The hour is for the new pool to have a
+    history before its price means anything and for the depth alert to
+    reach the owner. The residual, accepted: once the new pool is active,
+    an attacker who owns its liquidity can withdraw it and then drag a
+    thin pool's price over a window, against bots that take their money
+    on every push; the depth alert, the pause and the bots answer it, and
+    the per-chain delay is the lever if a chain turns out to have no
+    bots. The app alerts when a backstop pool's depth falls under the
+    floor, so the owner has the hour in hand; the guard refuses a buy
+    whose backstop pool no longer clears the floor until the re-point
+    activates, while a sale still goes through on the wide band.
     Kinds that would need a keeper of ours (Uniswap v2 pairs through their
     cumulative accumulators against registry snapshots; Uniswap v4 pools
     through sampled observations by designated keepers) are **not built**:
