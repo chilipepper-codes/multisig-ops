@@ -113,9 +113,10 @@ the signer service. Agents never hold any key and never touch mainnet.
 11. **I can halt all trading at once with the home key; resuming needs two
     keys plus the delay.** The registry's pause flag, set by any role
     member, cleared through story 2's path. The guard refuses every call
-    while it is set except the allowance withdrawal (story 7), so a pause
-    set by a compromised app cannot block the duress payout. Residual:
-    none.
+    while it is set except the allowance withdrawal (story 7) and the
+    close of a range order, so a pause set by a compromised app cannot
+    block the duress payout, and a filled range can still be collected
+    before the price comes back. Residual: none.
 12. **I hear within minutes of any whitelisting queued, any Delay entry and any
     trade I did not make.** The monitoring step of the roadmap; its shape
     is to be decided with the owner. Stories 2, 9 and 10 depend on it.
@@ -187,11 +188,11 @@ the signer service. Agents never hold any key and never touch mainnet.
     guard, which enforces it on the outcome; Rabby's simulation shows the
     Safe's balance changes, and a clear-signing descriptor would put the
     input and the minimum on the Ledger's screen once Ledger's registry
-    accepts it (low priority). For the engine's own trades the signer
-    service verifies the minimum against prices it reads itself on chain,
-    and the app predicts a refusal before arming.
-    Residual: a minimum is as honest as whoever sets it, which is why the
-    backstop exists for a stolen home key or a compromised signer.
+    accepts it (low priority). For the engine's own trades the minimum is
+    the engine's own; the signer does not second-guess it. Residual: a
+    minimum is as honest as whoever sets it, which is why the backstop
+    exists for a stolen home key or a compromised executor, and the
+    allowances bound what either can do where there is no backstop.
 
 ## Operations
 

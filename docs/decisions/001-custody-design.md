@@ -131,12 +131,12 @@ session notes):
     simulation is the pre-sign defence and the outcome check still catches
     a tampered minimum on chain; low priority, back of the roadmap, owner
     2026-11-10); for the engine's own
-    trades the signer service, the separate process that holds the KMS
-    grant, verifies every intent's minimum against its own independent
-    price lookup and refuses to sign past the policy's slippage, so a
-    compromised executor cannot lower it. What a caller-supplied minimum
-    cannot defend against is the caller being the attacker, a stolen home
-    key setting it to zero, or a compromised signer. For that the guard
+    trades the minimum is the engine's own, with no off-chain second line
+    (the signer's price check of an earlier draft is dropped as a
+    duplicate, 2026-11-10; the signer's section below says what it keeps).
+    What a caller-supplied minimum cannot defend against is the caller
+    being the attacker: a compromised executor or a stolen home key
+    setting it to zero. For that the guard
     keeps an on-chain **backstop**: where the registry names a reference
     pool for the token, the effective minimum is the larger of the
     caller's and the one derived from that pool's time-weighted price less
@@ -181,7 +181,12 @@ session notes):
     activates: the new pool is of a supported kind; its depth is at least
     the floor and at least the old pool's, in stable terms; and its
     time-weighted price is within the band of the old backstop's, so a
-    re-point cannot move the reference price in one step. The delay, not
+    re-point cannot move the reference price in one step. When the old
+    pool is what broke, drained or dragged, that last check can refuse an
+    honest deeper pool; buys of the token then stay refused and the
+    fallback is the two-key re-point through the Delay, which skips the
+    continuity check, so it is named here rather than discovered under
+    pressure (the tracker session's review, 2026-11-11). The delay, not
     two keys, because the attack a re-point invites fails on its own on a
     chain with arbitrage bots: a pool of the attacker's own, funded past
     the floor with the price where they want it, is drained by the bots
@@ -365,7 +370,12 @@ session notes):
     is legible and safe; the hazard to avoid is an allowance that is not
     zero but cannot be paid. The pause follows the same logic: a
     trader-role call that stops trading but never `withdrawAllowance`, so
-    that while the allowance is not zero it stays payable. Selling any token the Safe holds back
+    that while the allowance is not zero it stays payable, and never the
+    guard's range close either (the tracker session's review, 2026-11-11):
+    on v4 the guard does the close, and a filled range that cannot be
+    collected un-fills if the price comes back, which would turn a pause
+    into a reversed sale; a close has no price exposure and delivers only
+    to the Safe, the same argument that exempts the payout. Selling any token the Safe holds back
     into the reserve set is never capped and needs no whitelisting, since the
     approver grants the guard its approval at sale time. A token bought
     under the degen allowance stays on the degen path, re-buys included,
@@ -398,9 +408,10 @@ session notes):
     every swap and open, and one for the degen path, debited with every
     non-whitelisted buy and every `withdrawAllowance`; and a **pause flag** (owner,
     2026-11-05): any role member sets it with a role call, at once, and
-    the guard refuses every call but `withdrawAllowance` while it is set
-    (an allowance that is not zero must stay payable; owner,
-    2026-11-10); clearing it is the
+    the guard refuses every call but `withdrawAllowance` and the range
+    close while it is set (an allowance that is not zero must stay
+    payable, and a filled range must stay collectable; owner, 2026-11-10
+    and 2026-11-11); clearing it is the
     owner's, two keys through the Delay. It is what bounds a compromised
     app key the moment the owner notices, since removing a role member is
     a two-key change. Buys of the
