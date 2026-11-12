@@ -635,9 +635,22 @@ session notes):
   calling contract, the Safe; the Zodiac module path leaves the Safe as
   the caller.
 - **Trading is by API wallets**, approved through CoreWriter by two keys:
-  the owner's browser agent and the app's KMS key. API wallets cannot
+  the owner's own agent and the app's KMS key. API wallets cannot
   withdraw by Hyperliquid's own rules; the engine signs orders with the
-  KMS key off-chain exactly as before.
+  KMS key off-chain exactly as before. Three facts bind the owner's agent
+  (researched 2026-11-12): an agent is only a signer, and every read needs
+  the master's address, so whatever interface the owner trades in must
+  read the Safe and sign with the agent; the agent must be a software
+  key, held by a frontend, a phone or our app, because Rabby and MetaMask
+  reject the typed-data domain Hyperliquid uses for orders, so the Ledger
+  cannot be the trading agent; and the unnamed agent slot is the one
+  Hyperliquid's own frontend uses, approving a new unnamed agent
+  deregisters the previous one, and agents expire, so the CoreWriter
+  approval is redone on a schedule and carries a name where the interface
+  allows. Which interface the owner trades in is a testnet question
+  (roadmap step 4): Hyperliquid's own interfaces are built for an agent
+  the master approves in the browser, which a Safe cannot sign, so each
+  option has to be tried.
 - **Deposits are role calls with the destination in the signed calldata**,
   never a transfer to an address that is not the Safe's own, **under a
   Hyperliquid deposit allowance per window** (owner, 2026-11-10). The
