@@ -124,7 +124,7 @@ session notes):
     own account, and the balances change on the Safe, so Rabby's pre-sign
     simulation shows a contract interaction with no amount for the signer,
     and with the contracts unverified by the owner's choice (closed source
-    until the app is published) it decodes no parameters either. The owner accepts that, with one requirement on the app (owner, 2026-11-12): before every home-key signature it simulates the role call at the Safe's level and shows the Safe's balance changes, what Rabby's simulation shows for a plain wallet; the bar the product is held to is Rabby with a Ledger, blind-signed, and this meets it, with the backend (a simulation RPC or a local fork) chosen in the tracker's custody-screens step. The simulation is the app's, so it shares the app's residual below; the app's amounts are trusted after the testnet soak and small live amounts, Zodiac Pilot gives a Safe-level simulation on the chains it supports, and a Ledger clear-signing
+    until the app is published) it decodes no parameters either. The owner accepts that, with one requirement on the app (owner, 2026-11-12): before every home-key signature it simulates the role call at the Safe's level and shows the Safe's balance changes, what Rabby's simulation shows for a plain wallet; the bar the product is held to is Rabby with a Ledger, blind-signed, and this meets it, with the backend (a simulation RPC or a local fork) chosen by the developers when the tracker's custody screens are built, never a choice shown to the user. The simulation is the app's, so it shares the app's residual below; the app's amounts are trusted after the testnet soak and small live amounts, Zodiac Pilot gives a Safe-level simulation on the chains it supports, and a Ledger clear-signing
     descriptor (ERC-7730) would put the input and the minimum on the
     hardware screen once Ledger's registry accepts it, low priority, back
     of the roadmap. Until then the outcome check on chain is what catches
@@ -790,9 +790,7 @@ session notes):
   condition on a Roles allowance that refills every week (Roles tracks
   the balance, the refill and the period itself). No guard function, no
   registry entry, no unwrapping: the target address in the policy is the
-  pin. Raising or lowering the allowance and re-pinning the address (a
-  KMS key rotation is a new address) are policy changes, two keys through
-  the Delay; the home key may call the transfer too. The fork harness
+  pin. Raising or lowering the allowance and re-pinning the address are policy changes, two keys through the Delay (a KMS key version is a new address, but a signing key is rotated only on a suspected compromise, when the new address joins the role through the Delay anyway; the freeze disables and re-enables the same version, same address); the home key may call the transfer too. The fork harness
   confirms the scoping of an empty-calldata call (Roles evaluates the
   condition tree on a target entry whatever the calldata; on 2.1.1 the
   entry is keyed under selector `0x00000000`). Residual: the allowance
