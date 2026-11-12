@@ -35,8 +35,7 @@ accepted), an **approver** module that
 grants the guard its token approvals, deposits to the owner's Kraken
 account at an address the registry pins per chain (owner, 2026-11-06:
 Kraken's global settings lock makes it another vault of the owner's), a
-wide (30%) band over a short
-window on sales, and a **pause flag** any role member can set; the CoW
+wide (30%) band over a short window on sales, a **pause flag** any role member can set, and a weekly gas allowance for the app key as a Roles allowance on a native transfer to its own address (owner, 2026-11-12); the CoW
 presets out; Hyperliquid: the same Safe on HyperEVM, API wallets for
 trading; the app's key in Cloud KMS; fork tests before
 any policy goes live; agents never hold a key, never touch mainnet.
@@ -59,16 +58,22 @@ any policy goes live; agents never hold a key, never touch mainnet.
    Arbitrum, Ethereum and Robinhood Chain: the guard's functions (swap,
    open, bridge) for the trader role, the position manager's close
    functions with the proceeds pinned to the Safe, the registry's remove,
-   the CoreWriter policy on HyperEVM, the Kraken deposit address pinned
-   per chain, and the must-fail list (ADR-001);
+   the CoreWriter policy on HyperEVM, the Kraken deposit address pinned per chain, the app key's gas transfer under its weekly Roles allowance, and the must-fail list (ADR-001);
    the
    apply and verify scripts that read the modifier's events (no subgraph
    on Robinhood Chain).
-3. **Same-address Safes by script** (the funded Safe at 3 of 3, the
-   2-of-3 Safe on its Delay), the Delay cooldowns (the owner path's, owned
-   by the funded Safe; the whitelisting Delay's, owned by the vault key), a
+3. **Same-address Safes by script, published as the setup plan** (owner,
+   2026-11-12): the funded Safe at 3 of 3 and the 2-of-3 Safe on its
+   Delay, created at their final thresholds with all three keys at hand,
+   the Delay cooldowns (the owner path's, owned by the funded Safe; the
+   whitelisting Delay's, owned by the vault key), the policy, the pins
+   and the allowances, as the versioned, hash-pinned plan the tracker's
+   onboarding drives (portfolio-tools ADR-014), with the verify script
+   (the read-back and the must-fail list on a fork, once per Safe); a
    role call and a queued whitelisting through Rabby with the Ledger — on
-   testnets first.
+   testnets first. HyperEVM (2026-11-05) and Robinhood Chain (2026-11-12)
+   hold the Safe 1.4.1 stack, Roles 2.1.1, Delay 1.1.1 and the factories
+   at their canonical addresses, read from the chain.
 4. **Hyperliquid on testnet, the Safe as the account** (decided
    2026-11-05; ADR-001's Verify step 1): the same-address Safe, Roles and
    Delay on HyperEVM testnet; the CoreWriter policy scoped as `Calldata`;
@@ -109,10 +114,12 @@ any policy goes live; agents never hold a key, never touch mainnet.
    Delay, every entry on the owner-path Delay and every role execution,
    since a coerced whitelisting is delayed and visible rather than refused, and
    the veto is worth nothing unseen.
-8. **Go live in stages**: the funded Safe at threshold 1 for a week, then
-   the three owners at 3 of 3 with the 2-of-3 Safe on the Delay;
-   Hyperliquid last, after step 4's soak, with the balance at trading
-   size.
+8. **Go live in stages** (owner, 2026-11-12): the Safes at their final
+   thresholds from the first transaction, with all three keys kept at
+   home through the testing period; every story exercised with small
+   funds until the owner is confident; then the vault and third keys go
+   to their locations and the book moves in; Hyperliquid last, after
+   step 4's soak, with the balance at trading size.
 
 ## Queued, no decision made
 

@@ -12,7 +12,7 @@ Ledger, used through Rabby), the **vault key** (in a bank vault) and a
 Cloud KMS key. Home key and app key are interchangeable below, both being
 members of the trader role, with two exceptions: only the home key can
 queue a whitelisting (story 4), and the app key never signs anything outside
-the signer service. Agents never hold any key and never touch mainnet.
+the signer service. The owner keeps all three keys at home through the testing period and moves them to their locations before real money goes in (owner, 2026-11-12). Agents never hold any key and never touch mainnet.
 
 ## Funds and keys
 
@@ -107,8 +107,7 @@ the signer service. Agents never hold any key and never touch mainnet.
     other exit: every swap,
     open, bridge and Hyperliquid transfer delivers to the Safe's own
     address, approvals go only to the guard, and the one external
-    destination, the owner's Kraken account (story 17), returns funds only
-    to the bank or the Safes. Residuals, each accepted: story 9's
+    destination, the owner's Kraken account (story 17), returns funds only to the bank or the Safes; the app key's gas (story 20) goes to the app key's own address, a week's allowance at most. Residuals, each accepted: story 9's
     whitelisting attack after three days; story 4's sandwich on sales.
     Story 11 ends both once noticed.
 11. **I can halt all trading at once with the home key; resuming needs two
@@ -190,8 +189,7 @@ the signer service. Agents never hold any key and never touch mainnet.
     the app: a home-key trade is a role call signed by my Ledger's own
     account and the balances change on the Safe, so Rabby's simulation
     shows no amount for me, and with the contracts unverified it decodes
-    no parameters. I trust the app's amounts after the testnet soak and
-    small live amounts, Zodiac Pilot gives a Safe-level simulation where
+    no parameters. The app simulates the call at the Safe's level and shows me the Safe's balance changes before I sign, as Rabby does for my own wallet; the bar is Rabby with a Ledger, blind-signed, and this meets it (owner, 2026-11-12). I trust the app's amounts after the testnet soak and small live amounts, Zodiac Pilot gives a Safe-level simulation where
     it supports the chain, and a clear-signing descriptor would put the
     input and the minimum on the Ledger's screen once Ledger's registry
     accepts it (low priority). For the engine's own trades the minimum is
@@ -205,8 +203,29 @@ the signer service. Agents never hold any key and never touch mainnet.
 15. **I can replace a contract (the guard, the registry, the approver, a
     router that changed) with two keys plus the delay.** The addresses
     are immutables in the guard and conditions in Roles, so a replacement
-    is a new deployment plus a policy change through story 2's path.
-    Residual: none.
+    is a new deployment plus a policy change through story 2's path. Residual: none.
 16. **The policy in force is what the fork suite proved.** Every allowed
     call passes, every must-fail call reverts, on every chain, on every
     change and on a schedule; a policy change ships with its tests.
+20. **The app key never runs out of gas unnoticed, and it never takes
+    more than gas.** The Safe holds some native for gas, which I keep
+    topped up by hand like any of my wallets. The app tops the app key up
+    from the Safe, on a click or on its own under a threshold I set,
+    through a plain native transfer to the app key's address scoped in
+    Roles with a weekly allowance (ADR-001, the app's key); raising or
+    lowering the allowance, or re-pinning the address, is story 2's path.
+    Residual: a week's gas allowance per chain, the one transfer out of
+    the Safe a compromised app can make.
+21. **I can create the whole system on a new chain from the app, with my
+    three keys at hand, and check it before I fund it.** The app drives
+    multisig-ops' versioned setup plan step by step, each step one
+    signature with the key it names; the Safes are created at their
+    final thresholds, and enabling the modules and applying the policy is
+    one 3-of-3 transaction per chain. At the end the app reads the
+    deployed state back and runs the must-fail list on a fork of the new
+    Safe, and I compare the owners it shows with my own copy of the
+    addresses before anything moves in. Residual: a compromised app can
+    propose a wrong input, the owner addresses first of all; the read-back
+    against my own copy is what catches it, and the privileged setup
+    calls go to verified Safe and Zodiac contracts that Rabby and the
+    Ledger decode.

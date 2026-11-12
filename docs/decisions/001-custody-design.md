@@ -10,8 +10,7 @@ stories (`docs/stories.md`, the spec this design is measured against):
 three owner keys, 3 of 3 direct and 2 of 3 through the Delay, a wide
 band on sales, the whitelisting attack accepted at a three-day cooldown (both
 Delays configurable, three days by default), a pause flag; decided 2026-11-05 (owner): the Safe is the Hyperliquid
-account, validated on testnet before live funds, the native multi-sig out;
-nothing built yet. Solana is
+account, validated on testnet before live funds, the native multi-sig out; amended 2026-11-12 (owner): a weekly gas allowance for the app key as a Roles allowance, the Safes created at their final thresholds from a published setup plan with all three keys at hand, the app's Safe-level simulation before every signature; nothing built yet. Solana is
 **proposed**, not decided (last section). Every "verify" line below is a
 testnet or fork step that precedes real funds.
 
@@ -40,8 +39,7 @@ session notes):
 
 - Safe is live on Robinhood Chain; the Zodiac Roles 2.1.1 and Delay 1.1.1
   mastercopies are deployed there at their canonical addresses (the owner
-  confirmed non-empty bytecode). The Zodiac app, its subgraph and the Pilot
-  extension do not list the chain yet.
+  confirmed non-empty bytecode; re-read from the chain 2026-11-12: the Safe 1.4.1 stack, the singletons, the proxy factory, MultiSendCallOnly and the fallback handler, the ModuleProxyFactory, the MultiSend unwrapper, Roles 2.1.1 and 2.1.0, Delay 1.1.1, both singleton factories, Permit2 and Multicall3, all at their canonical addresses, so nothing needs deploying there before the Safes). The Zodiac app, its subgraph and the Pilot extension do not list the chain yet.
 - Zodiac had two bugs this year: the June 2026 ERC-1271 authorization bypass
   (Roles 2.1.0 / Delay 1.1.0; exposed only setups where a *Safe* was a role
   member or an enabled module; patched 2.1.1 / 1.1.1 on June 19) and a
@@ -102,8 +100,7 @@ session notes):
   address (the Kraken bullet below). Nothing else the role allows sends
   funds to an address that is not the Safe's own (amended 2026-11-05: the
   Hyperliquid deposit hop, the one such transfer, is gone with the native
-  multi-sig; amended 2026-11-06: the Kraken deposit is the one that
-  remains, and it is an exit only into another vault of the owner's). The token set, the per-pool parameters and
+  multi-sig; amended 2026-11-06: the Kraken deposit is the one that remains, and it is an exit only into another vault of the owner's; amended 2026-11-12: and the app key's gas, a native transfer to the app key's own address under a weekly Roles allowance, the gas bullet in the app's key section). The token set, the per-pool parameters and
   the per-period notionals are the registry's, not Roles conditions
   (amended 2026-11-05: Roles scopes calls per target address and cannot
   scope "approve on any token", so a token set in Roles would make every
@@ -127,10 +124,7 @@ session notes):
     own account, and the balances change on the Safe, so Rabby's pre-sign
     simulation shows a contract interaction with no amount for the signer,
     and with the contracts unverified by the owner's choice (closed source
-    until the app is published) it decodes no parameters either. The
-    owner accepts that: the app's amounts are trusted after the testnet
-    soak and small live amounts, Zodiac Pilot gives a Safe-level
-    simulation on the chains it supports, and a Ledger clear-signing
+    until the app is published) it decodes no parameters either. The owner accepts that, with one requirement on the app (owner, 2026-11-12): before every home-key signature it simulates the role call at the Safe's level and shows the Safe's balance changes, what Rabby's simulation shows for a plain wallet; the bar the product is held to is Rabby with a Ledger, blind-signed, and this meets it, with the backend (a simulation RPC or a local fork) chosen in the tracker's custody-screens step. The simulation is the app's, so it shares the app's residual below; the app's amounts are trusted after the testnet soak and small live amounts, Zodiac Pilot gives a Safe-level simulation on the chains it supports, and a Ledger clear-signing
     descriptor (ERC-7730) would put the input and the minimum on the
     hardware screen once Ledger's registry accepts it, low priority, back
     of the roadmap. Until then the outcome check on chain is what catches
@@ -608,9 +602,36 @@ session notes):
   `execTransactionWithRole` calls for the role member to sign with the Ledger
   through Rabby. On the other chains the Zodiac app and Pilot are used as is.
   Ask Gnosis Guild to add the chain; do not depend on it.
-- **Same-address Safes by script** (factory, singleton, initializer, salt
-  replayed per chain), until Safe{Wallet}'s multi-chain deployment covers
-  Robinhood Chain.
+- **Same-address Safes by script, published as a setup plan** (amended
+  2026-11-12, owner). The deployment scripts (factory, singleton,
+  initializer and salt replayed per chain; the module proxies from the
+  ModuleProxyFactory, their owners set at deployment, the vault key's
+  Delay included; the policy; the pins and the allowances) are published
+  as a versioned plan, pinned by its hash: the ordered transactions per
+  chain, the key that signs each, the expected end state. The tracker's
+  onboarding flow renders and drives that plan, one signature per step,
+  and never composes a setup transaction of its own (portfolio-tools
+  ADR-014). The Safes are created at their final thresholds, 3 of 3 and
+  2 of 3, with all three keys at hand: the owner keeps the three keys at
+  home through the testing period and moves them to their locations
+  before real money goes in, so there is no lower-threshold period and
+  no collecting of signatures across visits. Deploying the Safe and the
+  proxies needs no owner signature; enabling the modules, applying the
+  policy and setting the pins is one 3-of-3 MultiSend per chain, so every
+  key signs at creation and a wrong owner address fails there, not
+  later. The plan's inputs are not covered by the hash, the three owner
+  addresses first of all, and a compromised app would substitute one;
+  the read-back at the end (owners, thresholds, modules, the Roles
+  configuration from the modifier's events, the cooldowns, the registry)
+  is therefore compared by the owner against a copy of the addresses kept
+  off the app. The Safe and Zodiac contracts are verified, standard code,
+  so every privileged setup call decodes in Rabby and on the Ledger; our
+  unverified contracts hold no privilege over the funds. The verify
+  script, the same read-back plus the must-fail list on a fork, is the
+  harness's own check (build step 1) run against a live Safe: the app
+  runs it in its simulation backend at creation, and it can be run from
+  this repository by hand, once per Safe, never per transaction.
+  Safe{Wallet}'s multi-chain deployment is not needed.
 
 ### Hyperliquid (decided 2026-11-05: the Safe is the account)
 
@@ -680,8 +701,7 @@ session notes):
   and controls as the degen allowance: a rolling window equal to the owner
   path's cooldown, lowering a trader-role call, raising two keys through
   the Delay; withdrawals back to the Safe uncapped. Rails, best first:
-  (1) **CCTP v2 with Circle's forwarder**: one transaction from the
-  Arbitrum Safe, `depositForBurnWithHook` with the mint recipient and
+  (1) **CCTP v2 with Circle's forwarder**: one transaction from the Arbitrum Safe (Arbitrum joins the tracker's chains for it, portfolio-tools ADR-014, owner 2026-11-12), `depositForBurnWithHook` with the mint recipient and
   destination caller pinned to Circle's forwarder on HyperEVM and the
   HyperCore recipient, the Safe, in the hook data (bytes 32 to 52, pinned
   by Roles' bitmask), which the forwarder deposits for the Safe into perp
@@ -755,8 +775,30 @@ session notes):
   price a flash swap could move a thin pool to, in one bundle (a swap with
   no trusted minimum output, or a single-sided open just beyond the moved
   price); with it, a bad trade costs the attacker what it takes to move a
-    deep pool's time-weighted price out of the band. Never a seed in the
+  deep pool's time-weighted price out of the band. Never a seed in the
   app.
+- **Gas for the app key (owner, 2026-11-12).** The Safe holds some native
+  for gas like any of the owner's wallets, and the owner keeps it topped
+  up by hand, a swap through the guard or a transfer in; no automation of
+  that for now. The app key pays the gas of every role transaction and of
+  every Delay entry it executes, and nobody watches its balance, so an
+  automated strategy could stall on an empty key; the app therefore tops
+  the key up from the Safe, on a click or on its own under a threshold
+  the owner sets. The mechanism is Roles' own: a plain native transfer
+  from the Safe to the app key's address, a trader-role call scoped as
+  that one target with Send allowed and an `EtherWithinAllowance`
+  condition on a Roles allowance that refills every week (Roles tracks
+  the balance, the refill and the period itself). No guard function, no
+  registry entry, no unwrapping: the target address in the policy is the
+  pin. Raising or lowering the allowance and re-pinning the address (a
+  KMS key rotation is a new address) are policy changes, two keys through
+  the Delay; the home key may call the transfer too. The fork harness
+  confirms the scoping of an empty-calldata call (Roles evaluates the
+  condition tree on a target entry whatever the calldata; on 2.1.1 the
+  entry is keyed under selector `0x00000000`). Residual: the allowance
+  per week per chain, sized for gas (Ethereum higher than the L2s), is
+  the one transfer out of the Safe the app key can make and the most a
+  compromised app can drain; Consequences and story 10 count it.
 - **The signer service** (build step 5; slimmed 2026-11-10 after the
   owner's question of what it buys over the chain's own checks). The
   engine never signs: it sends the signer an intent (chain, account,
@@ -797,10 +839,7 @@ session notes):
 
 - **This repository** holds the custody layer: the user stories
   (`docs/stories.md`) the design is measured against, the policies as
-  code, the guard, the registry and the approver, the apply and verify
-  scripts, the fork test suite, the
-  Safe deployment scripts, the Hyperliquid multi-sig tooling, the KMS
-  signer service. The portfolio
+  code, the guard, the registry and the approver, the apply and verify scripts, the fork test suite, the Safe deployment scripts published as the setup plan the tracker's onboarding drives, the Hyperliquid multi-sig tooling, the KMS signer service. The portfolio
   tracker keeps the execution engine and talks to this layer through a
   narrow intent API; it records the boundary in its own ADR.
 - **Agents never hold any of these keys and never run against mainnet.**
@@ -857,14 +896,11 @@ session notes):
    position manager (a partial fill decreased and collected to the Safe, a
    reload cycle as one MultiSend), the bridge permission, the Kraken
    deposit (a `sendToExchange` to the pinned address passes; to any other
-   address reverts; changing the pinned address by the role reverts), and
-   the must-fail list, with a
+   address reverts; changing the pinned address by the role reverts), the app key's gas (a native transfer to the app key's address passes within the week's allowance and reverts above it; to any other address reverts; the allowance refills after the period), and the must-fail list, with a
    direct router call, a direct `mint`, the position NFT's transfers and
    approvals, an approval to another spender or above the allowance, and a
    `collect` to another recipient among it.
-3. Safe deployment at the same address on Robinhood Chain, the funded
-   Safe at 3 of 3 and the 2-of-3 Safe on its Delay; a role call through
-   Rabby with the Ledger; a two-key withdrawal that waits the cooldown; a
+3. Safe deployment at the same address on Robinhood Chain from the setup plan, driven from the app with all three keys at hand, the funded Safe at 3 of 3 and the 2-of-3 Safe on its Delay from the first transaction, the read-back matching the plan's end state and the must-fail list on a fork of the new Safe; a role call through Rabby with the Ledger; a two-key withdrawal that waits the cooldown; a
    three-key withdrawal that does not, with a module disabled; the skip
    by three keys and the expiration.
 4. The guard's audit, its findings closed in the fork suite, before any real
@@ -900,10 +936,8 @@ session notes):
   visible on chain, and then at most the whitelisted path's per-period
   notional in a pool that clears the floors. It can send the book to the
   owner's Kraken account, where Kraken's global settings lock allows
-  withdrawals only to the bank or back to the Safes. It cannot send
-  anything elsewhere.
-- **A stolen home key**, with no owner to coerce, takes the degen
-  allowance per cooldown window, by a plain withdrawal. The residuals, each accepted by the owner
+  withdrawals only to the bank or back to the Safes. It cannot send anything elsewhere, beyond a week of the app key's gas to the app key's own address.
+- **A stolen home key**, with no owner to coerce, takes the degen allowance per cooldown window, by a plain withdrawal, and a week's gas allowance to the app key's address, which is also the most a compromised app can move out of the Safe (2026-11-12). The residuals, each accepted by the owner
   (2026-11-05): after the three-day whitelisting cooldown, the whitelisted path's
   per-period notional into a pool of the thief's own, unless the vault key
   skips the whitelisting first; and a sandwich of the Safe's
