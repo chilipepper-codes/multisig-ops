@@ -186,8 +186,13 @@ the signer service. Agents never hold any key and never touch mainnet.
 19. **Before I sign a trade, I see the amounts I expect to receive and the
     tolerance, and the trade reverts if the Safe gets less.** The app
     looks prices up, shows the amounts, and passes the minimum to the
-    guard, which enforces it on the outcome; Rabby's simulation shows the
-    Safe's balance changes, and a clear-signing descriptor would put the
+    guard, which enforces it on the outcome. The amounts I see come from
+    the app: a home-key trade is a role call signed by my Ledger's own
+    account and the balances change on the Safe, so Rabby's simulation
+    shows no amount for me, and with the contracts unverified it decodes
+    no parameters. I trust the app's amounts after the testnet soak and
+    small live amounts, Zodiac Pilot gives a Safe-level simulation where
+    it supports the chain, and a clear-signing descriptor would put the
     input and the minimum on the Ledger's screen once Ledger's registry
     accepts it (low priority). For the engine's own trades the minimum is
     the engine's own; the signer does not second-guess it. Residual: a

@@ -121,16 +121,21 @@ session notes):
     (owner, 2026-11-09). The app looks prices up off-chain, shows the
     owner the amounts it expects to receive and the tolerance, and passes
     the minimum to the guard, which enforces it on the outcome. That is
-    the primary check, and it is strong wherever the caller is honest:
-    the owner signing through Rabby sees the amounts (Rabby's pre-sign
-    simulation shows the Safe's balance changes, and a Ledger
-    clear-signing descriptor for the guard's calls, ERC-7730, would put
-    the input and the minimum on the hardware screen, which also defeats
-    malware rewriting calldata in the browser, once Ledger's registry
-    accepts it; until then the Ledger shows a blind-signing hash, Rabby's
-    simulation is the pre-sign defence and the outcome check still catches
-    a tampered minimum on chain; low priority, back of the roadmap, owner
-    2026-11-10); for the engine's own
+    the primary check, and it is strong wherever the caller is honest.
+    What the owner sees before signing comes from the app (corrected
+    2026-11-12): a home-key trade is a role call signed by the Ledger's
+    own account, and the balances change on the Safe, so Rabby's pre-sign
+    simulation shows a contract interaction with no amount for the signer,
+    and with the contracts unverified by the owner's choice (closed source
+    until the app is published) it decodes no parameters either. The
+    owner accepts that: the app's amounts are trusted after the testnet
+    soak and small live amounts, Zodiac Pilot gives a Safe-level
+    simulation on the chains it supports, and a Ledger clear-signing
+    descriptor (ERC-7730) would put the input and the minimum on the
+    hardware screen once Ledger's registry accepts it, low priority, back
+    of the roadmap. Until then the outcome check on chain is what catches
+    a tampered minimum, within the backstop band or the allowance, the
+    bounds a stolen home key has; for the engine's own
     trades the minimum is the engine's own, with no off-chain second line
     (the signer's price check of an earlier draft is dropped as a
     duplicate, 2026-11-10; the signer's section below says what it keeps).
@@ -475,8 +480,17 @@ session notes):
     read adapters, the registry and the approver, together a few hundred
     lines, so an audit before real
     funds, and the fork suite testing their reverts as it tests the
-    policy's. **Build notes for that audit** (the tracker session's
-    review, 2026-11-10): a reentrancy lock around the caller's calldata;
+        policy's. **Build notes for that audit** (the tracker session's
+    review, 2026-11-10 and 2026-11-12): the guard emits an event per
+    action with what the tracker needs to classify it, since the Safe's
+    own transfers only show the guard's address: `RangeClosed` with the
+    token id, the principal and the fees collected, each per token, for
+    the closes the guard does (on v3 the position manager's own
+    `DecreaseLiquidity` and `Collect` events give the same split);
+    `AllowanceWithdrawn` and `SentToExchange` with the token, the amount
+    and the final destination; `Swapped`, `RangeOpened` and `Bridged`
+    with their amounts and destination; a reentrancy lock around the
+    caller's calldata;
     the router approval reset to zero after every call; native value
     refused unless the route needs it; routers that pull through Permit2
     (the Universal Router does) served by the guard granting Permit2 a
