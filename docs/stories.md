@@ -111,12 +111,7 @@ the signer service. The owner keeps all three keys at home through the testing p
     whitelisting attack after three days; story 4's sandwich on sales.
     Story 11 ends both once noticed.
 11. **I can halt all trading at once with the home key; resuming needs two
-    keys plus the delay.** The registry's pause flag, set by any role
-    member, cleared through story 2's path. The guard refuses every call
-    while it is set except the allowance withdrawal (story 7) and the
-    close of a range order, so a pause set by a compromised app cannot
-    block the duress payout, and a filled range can still be collected
-    before the price comes back. Residual: none.
+    keys plus the delay.** The registry's pause flag, set by any role member, cleared through story 2's path. Setting it also sets the degen and the Hyperliquid deposit allowances to zero (owner, 2026-11-13), so a thief with the home key takes nothing more and a wrench attacker sees the legible zero of story 7; the guard refuses every call while it is set except the close of a range order, so a filled range can still be collected before the price comes back. Raising the allowances again rides the entry that clears the pause. Residual: none.
 12. **I hear within minutes of any whitelisting queued, any Delay entry and any
     trade I did not make.** The monitoring step of the roadmap; its shape
     is to be decided with the owner. Stories 2, 9 and 10 depend on it.

@@ -370,14 +370,11 @@ session notes):
     letting any role member lower it: a visible zero tells a wrench
     attacker that nothing moves without the vault key and the delay, which
     is legible and safe; the hazard to avoid is an allowance that is not
-    zero but cannot be paid. The pause follows the same logic: a
-    trader-role call that stops trading but never `withdrawAllowance`, so
-    that while the allowance is not zero it stays payable, and never the
-    guard's range close either (the tracker session's review, 2026-11-11):
+    zero but cannot be paid. The pause follows the same logic from the other side (owner, 2026-11-13, replacing the 2026-11-10 exemption of the payout): setting it also sets both allowances, the degen and the Hyperliquid deposit one, to zero, so a paused Safe shows the legible zero and there is never an allowance that is not zero but cannot be paid; raising them again rides the same two-key Delay entry that clears the pause. The pause never stops the guard's range close (the tracker session's review, 2026-11-11):
     on v4 the guard does the close, and a filled range that cannot be
     collected un-fills if the price comes back, which would turn a pause
     into a reversed sale; a close has no price exposure and delivers only
-    to the Safe, the same argument that exempts the payout. Selling any token the Safe holds back
+    to the Safe. Selling any token the Safe holds back
     into the reserve set is never capped and needs no whitelisting, since the
     approver grants the guard its approval at sale time. A token bought
     under the degen allowance stays on the degen path, re-buys included,
@@ -410,11 +407,7 @@ session notes):
     every swap and open, and one for the degen path, debited with every
     non-whitelisted buy and every `withdrawAllowance`; and a **pause flag** (owner,
     2026-11-05): any role member sets it with a role call, at once, and
-    the guard refuses every call but `withdrawAllowance` and the range
-    close while it is set (an allowance that is not zero must stay
-    payable, and a filled range must stay collectable; owner, 2026-11-10
-    and 2026-11-11); clearing it is the
-    owner's, two keys through the Delay. It is what bounds a compromised
+    setting it also sets the degen and the Hyperliquid deposit allowances to zero (owner, 2026-11-13: a paused Safe shows the legible zero, so a thief with the home key takes nothing further and a wrench attacker sees that nothing moves), and the guard refuses every call but the range close while it is set (a filled range must stay collectable; 2026-11-11); clearing it, and raising the allowances again, is the owner's, two keys through the Delay, in one entry. It is what bounds a compromised
     app key the moment the owner notices, since removing a role member is
     a two-key change. Buys of the
     reserve set (the stablecoins and WETH, a two-key list) count for
@@ -896,9 +889,7 @@ session notes):
    reverts; a removal by the role is immediate), the approver (refuses any
    caller but the guard and any spender but the guard; a degen token
    bought in one block is sold in the next, through the pool it was bought
-   in, and a sale routed to another pool reverts), the pause (set by a
-   role call, the guard refuses everything; cleared only through the
-   Delay), the close permission on the
+   in, and a sale routed to another pool reverts), the pause (set by a role call, both allowances read zero at once, the guard refuses everything but a range close, a `withdrawAllowance` reverts; cleared, with the allowances raised again, only through the Delay), the close permission on the
    position manager (a partial fill decreased and collected to the Safe, a
    reload cycle as one MultiSend), the bridge permission, the Kraken
    deposit (a `sendToExchange` to the pinned address passes; to any other
