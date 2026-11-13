@@ -144,12 +144,35 @@ decided and another solution possible when the work is taken up:
   the executor; Squads' program and app are theirs; a custom policy program
   would be ours to deploy and audit.
 
+### Polymarket, its own PR after this one (owner, 2026-11-13)
+The shape is agreed, the ADR section and the story are not written. A
+Polymarket **Deposit Wallet owned by the vault key**: the home key cannot
+withdraw from it, so under duress or with a stolen home key nothing
+leaves Polymarket; the app trades through a **session key**, a KMS
+signature under the signer's order policy, which Polymarket's rule keeps
+from withdrawing (renewed by the vault key at a fixed 180 days, batched
+with its other visits); the **Polygon Safe** (Polygon joins the chains)
+feeds it through a pinned destination under a **Polymarket deposit
+allowance** with the Hyperliquid one's window and controls; every
+withdrawal back is a vault-key action, so the balance is sized for a bank
+trip; a lost vault key loses that balance, accepted as understood.
+Residual: a sale into an attacker's own bid with the session key, bounded
+by the balance plus one allowance per window. Manual trading goes through
+the app's screen or a third-party frontend that accepts a session key,
+since polymarket.com logs in as the owner. Checks on Polygon's Amoy
+testnet first: a Ledger-held owner signing the wallet's EIP-712 batches;
+whether a Deposit Wallet has any owner-change or recovery path; what the
+owner's Relayer API key can do without the owner's signature. The Safe as
+the Polymarket account itself (the V2 exchange accepts ERC-1271 makers)
+waits on Roles v3's typed-message signing and on Polymarket's order API
+accepting a maker that is not one of its wallets: an idea below.
+
 ### Ideas, not committed
 - **Hyperliquid withdrawal whitelist**: ask Hyperliquid for a destination
   whitelist on `withdraw3`; it would give the home-key-only withdrawal the
   design cannot offer today.
-- **UniswapX intents through the Safe** once Roles v3 ships its typed-message
-  signing library, as a second swap path on Robinhood Chain that needs no
+- **UniswapX intents, and Polymarket orders with the Safe as the maker,
+  through the Safe** once Roles v3 ships its typed-message signing library, as a second swap path on Robinhood Chain that needs no
   router conditions.
 - **External feeds on the guard** (Chainlink, Pyth) as a sanity check on a
   tokenized stock's pricing hop, where a feed is deployed on the chain;
