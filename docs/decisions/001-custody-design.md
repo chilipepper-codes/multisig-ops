@@ -90,8 +90,7 @@ session notes):
 - **One role, "trader", two members:** the home Ledger's EOA and the app's
   KMS key. What the role allows, and nothing else: calls to the guard
   (swaps and range-order opens, on the whitelisted path or the degen path as
-  the registry says, and bridges of any held token to the Safe's own
-  address on the other chain; the guard delivers everything to the Safe,
+  the registry says, and bridges of any held token to the Safe's own address on the other chain, and Hyperliquid deposits to the Safe's own account under the deposit allowance; the guard delivers everything to the Safe,
   next bullets; its approvals are the approver module's and need no role
   call); closing a range position on the position manager with the
   proceeds pinned to the Safe; removing a token from the registry; on
@@ -474,9 +473,7 @@ session notes):
     token id, the principal and the fees collected, each per token, for
     the closes the guard does (on v3 the position manager's own
     `DecreaseLiquidity` and `Collect` events give the same split);
-    `AllowanceWithdrawn` and `SentToExchange` with the token, the amount
-    and the final destination; `Swapped`, `RangeOpened` and `Bridged`
-    with their amounts and destination; a reentrancy lock around the
+    `AllowanceWithdrawn` and `SentToExchange` with the token, the amount and the final destination; `Swapped`, `RangeOpened`, `Bridged` and `DepositedToHyperliquid` with their amounts and destination; a reentrancy lock around the
     caller's calldata;
     the router approval reset to zero after every call; native value
     refused unless the route needs it; routers that pull through Permit2
@@ -679,9 +676,7 @@ session notes):
   (roadmap step 4): Hyperliquid's own interfaces are built for an agent
   the master approves in the browser, which a Safe cannot sign, so each
   option has to be tried.
-- **Deposits are role calls with the destination in the signed calldata**,
-  never a transfer to an address that is not the Safe's own, **under a
-  Hyperliquid deposit allowance per window** (owner, 2026-11-10). The
+- **Deposits go through the guard, which pins the destination to the Safe's own account and debits the allowance** (amended 2026-11-13 after the tracker session's review: a role call straight to CCTP would never meet the registry, so neither the allowance nor the pause's zero would bind it), never a transfer to an address that is not the Safe's own, **under a Hyperliquid deposit allowance per window** (owner, 2026-11-10). The
   allowance exists because Hyperliquid trading has no guard: a market
   sell on a thin book (the HIP-3 perps, most spot tokens) fills against
   whatever bid is there, and a bid placed by the attacker's own account
@@ -693,18 +688,7 @@ session notes):
   the Hyperliquid balance plus one allowance per window. Same bookkeeping
   and controls as the degen allowance: a rolling window equal to the owner
   path's cooldown, lowering a trader-role call, raising two keys through
-  the Delay; withdrawals back to the Safe uncapped. Rails, best first:
-  (1) **CCTP v2 with Circle's forwarder**: one transaction from the Arbitrum Safe (Arbitrum joins the tracker's chains for it, portfolio-tools ADR-014, owner 2026-11-12), `depositForBurnWithHook` with the mint recipient and
-  destination caller pinned to Circle's forwarder on HyperEVM and the
-  HyperCore recipient, the Safe, in the hook data (bytes 32 to 52, pinned
-  by Roles' bitmask), which the forwarder deposits for the Safe into perp
-  or spot; Circle's canonical contracts end to end, no aggregator, no
-  solver. (2) **Plain CCTP to the HyperEVM Safe**, then the Safe's own
-  deposit for itself through Circle's `CoreDepositWallet.depositFor` with
-  the recipient pinned to the Safe: two transactions, same trust. (3)
-  **The native bridge from Arbitrum**, credited to the sender: pinned by
-  construction. From other chains, first to the Arbitrum Safe over a
-  bridge with the destination pinned, then (1). Aggregators (Across's
+  the Delay; withdrawals back to the Safe uncapped. Rails, best first: (1) **CCTP v2 with Circle's forwarder, through the guard's `depositToHyperliquid`**: one transaction from the Arbitrum Safe (Arbitrum joins the tracker's chains for it, portfolio-tools ADR-014, owner 2026-11-12); the guard pulls the USDC (the approver grants it), calls `depositForBurnWithHook` with the mint recipient and destination caller pinned to Circle's forwarder on HyperEVM and the HyperCore recipient set by the guard to its caller, the Safe, in the hook data, which the forwarder deposits for the Safe into perp or spot; the guard debits the registry's deposit allowance and refuses while paused, so the allowance is a contract check like the degen one, and no Roles bitmask on the hook data is needed; Circle's canonical contracts end to end, no aggregator, no solver. (2) **Plain CCTP to the HyperEVM Safe through the same guard function**, then the Safe's own deposit for itself through Circle's `CoreDepositWallet.depositFor` as a HyperEVM role call with the recipient pinned to the Safe: two transactions, same trust, the allowance debited at the burn. (3) **The native bridge from Arbitrum** credits the sender, which through the guard would be the guard itself, so it is not a role call any more; it stays an owner-path option, if ever. From other chains, first to the Arbitrum Safe over a bridge with the destination pinned, then (1). Aggregators (Across's
   `HyperliquidDepositHandler`, LI.FI's Polymer CCTP facet, deBridge's
   orders) also carry the recipient in calldata, but their contracts and
   relayers join the trust path for nothing (LI.FI's facet is route (1)
@@ -861,10 +845,7 @@ session notes):
 ### Verify before real funds
 
 1. Hyperliquid testnet, the Safe as the account: the same-address Safe,
-   Roles and Delay deployed on HyperEVM testnet; a CCTP deposit from the
-   Arbitrum testnet Safe with the recipient pinned in the hook data,
-   credited to the Safe's HyperCore account (and a native-bridge deposit,
-   credited to the sender); an API wallet approved through CoreWriter by
+   Roles and Delay deployed on HyperEVM testnet; a CCTP deposit through the guard from the Arbitrum testnet Safe, the recipient pinned by the guard, credited to the Safe's HyperCore account and debited from the allowance; a deposit above the allowance, and one while paused, reverts; a role call straight to CCTP reverts; an API wallet approved through CoreWriter by
    two keys, then trading through it from the app and from the web UI; a
    class transfer and a send asset to the system address as role calls,
    the USDC landing on the HyperEVM Safe, and a pinned CCTP burn back to

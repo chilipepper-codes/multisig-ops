@@ -47,8 +47,7 @@ any policy goes live; agents never hold a key, never touch mainnet.
    list reverting. The acceptance test everything else is measured against.
 2. **The guard, the registry, the approver and the policy as code.** The
    guard (swap by outcome check against the caller's minimum through any
-   whitelisted router, range-order open and v4 close, bridge, send to
-   exchange, withdraw allowance; the backstop's read adapters for the
+   whitelisted router, range-order open and v4 close, bridge, Hyperliquid deposit, send to exchange, withdraw allowance; the backstop's read adapters for the
    free-oracle kinds only: Uniswap v3 and forks, Aerodrome v2-style,
    Algebra; deviation band, tick distance, a depth floor relative to the
    trade and an absolute one through a pricing path), the
@@ -77,8 +76,7 @@ any policy goes live; agents never hold a key, never touch mainnet.
 4. **Hyperliquid on testnet, the Safe as the account** (decided
    2026-11-05; ADR-001's Verify step 1): the same-address Safe, Roles and
    Delay on HyperEVM testnet; the CoreWriter policy scoped as `Calldata`;
-   a CCTP deposit with the recipient pinned in the hook data, credited to
-   the Safe; an API wallet approved through CoreWriter by two keys, then
+   a CCTP deposit through the guard, the recipient pinned by it and the allowance debited, credited to the Safe; an API wallet approved through CoreWriter by two keys, then
    trading through it; a class transfer and a send asset as role calls
    back to the HyperEVM Safe and a pinned CCTP burn to Arbitrum; every
       action confirmed through the precompiles, the node tracker's
@@ -109,11 +107,21 @@ any policy goes live; agents never hold a key, never touch mainnet.
    notionals, the signer's checks and the engine's checks.
 6. **The audit** of the guard, the registry and the approver, its findings
    closed in the fork suite, before any real funds pass through them.
-7. **Monitoring** (owner, 2026-11-05: yes; its shape to be decided with
-   the owner): at the least an alert on every whitelisting queued on the
-   Delay, every entry on the owner-path Delay and every role execution,
-   since a coerced whitelisting is delayed and visible rather than refused, and
-   the veto is worth nothing unseen.
+7. **Monitoring** (owner, 2026-11-05: yes; shape decided 2026-11-13: the
+   tracker's). The tracker's scheduled job reads both Delays, Roles, the
+   registry and the guard every few minutes and alerts on the dashboard
+   and by push for anything the owner did not start: a whitelisting or
+   re-point queued, any Delay entry, a role execution matching no order,
+   a Kraken deposit, an allowance withdrawal, a pause. A coerced
+   whitelisting is delayed and visible rather than refused, and the veto
+   is worth nothing unseen, so one independent channel outside the app,
+   set up once by the owner on the Safe and module addresses, backs it:
+   a compromised app hides its own alerts. This repository's part is the
+   event catalogue the job reads (both Delays' `TransactionAdded`, Roles'
+   executions, the registry's and the guard's events) and the runbook
+   for the independent channel per chain, with the alert services'
+   coverage of Robinhood Chain and HyperEVM checked first, since the
+   mainstream ones may not list them.
 8. **Go live in stages** (owner, 2026-11-12): the Safes at their final
    thresholds from the first transaction, with all three keys kept at
    home through the testing period; every story exercised with small

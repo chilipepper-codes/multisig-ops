@@ -112,9 +112,7 @@ the signer service. The owner keeps all three keys at home through the testing p
     Story 11 ends both once noticed.
 11. **I can halt all trading at once with the home key; resuming needs two
     keys plus the delay.** The registry's pause flag, set by any role member, cleared through story 2's path. Setting it also sets the degen and the Hyperliquid deposit allowances to zero (owner, 2026-11-13), so a thief with the home key takes nothing more and a wrench attacker sees the legible zero of story 7; the guard refuses every call while it is set except the close of a range order, so a filled range can still be collected before the price comes back. Raising the allowances again rides the entry that clears the pause. Residual: none.
-12. **I hear within minutes of any whitelisting queued, any Delay entry and any
-    trade I did not make.** The monitoring step of the roadmap; its shape
-    is to be decided with the owner. Stories 2, 9 and 10 depend on it.
+12. **I hear within minutes of any whitelisting queued, any Delay entry and any trade I did not make.** The app's (owner, 2026-11-13): a scheduled job reads the Delays, Roles, the registry and the guard every few minutes and alerts on the dashboard and by push for anything I did not start; one independent channel outside the app, set up once by me on the Safe and module addresses, backs it, since a compromised app hides its own alerts. This repository keeps the event catalogue the job reads and the runbook for the independent channel. Stories 2, 9 and 10 depend on it.
 
 ## Hyperliquid
 
@@ -122,10 +120,7 @@ the signer service. The owner keeps all three keys at home through the testing p
     an allowance per window.** The Safe itself is the Hyperliquid account: the same Safe at
     the same address on HyperEVM, where the whole Zodiac stack is
     deployed, controls its HyperCore account through CoreWriter, scoped
-    by Roles with no custom code. A deposit is a CCTP burn from the
-    Arbitrum Safe with the recipient pinned to the Safe in the signed
-    calldata (or a native-bridge deposit, credited to the sender), so it
-    is a transfer between the owner's own addresses. Decided 2026-11-05,
+    by Roles with no custom code. A deposit is the guard's `depositToHyperliquid`: a CCTP burn from the Arbitrum Safe with the recipient pinned to the Safe by the guard, which debits the allowance and refuses while paused (amended 2026-11-13), so it is a transfer between the owner's own addresses that the registry sees. Decided 2026-11-05,
     validated thoroughly on testnet before any live funds (ADR-001,
     Hyperliquid). The deposit allowance has the same window and controls
     as the degen one, because Hyperliquid trading has no guard: on a thin
