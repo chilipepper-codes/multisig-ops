@@ -172,8 +172,11 @@ accepting a maker that is not one of its wallets: an idea below.
   whitelist on `withdraw3`; it would give the home-key-only withdrawal the
   design cannot offer today.
 - **UniswapX intents, and Polymarket orders with the Safe as the maker,
-  through the Safe** once Roles v3 ships its typed-message signing library, as a second swap path on Robinhood Chain that needs no
-  router conditions.
+  through the Safe** once Roles v3 ships its typed-message signing
+  library: UniswapX as a second swap path on Robinhood Chain that needs
+  no router conditions; Polymarket when its order API accepts a maker
+  that is not one of its own wallets (the V2 exchange contract already
+  accepts ERC-1271).
 - **External feeds on the guard** (Chainlink, Pyth) as a sanity check on a
   tokenized stock's pricing hop, where a feed is deployed on the chain;
   never a dependency (ADR-001, the guard).
