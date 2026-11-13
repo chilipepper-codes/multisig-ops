@@ -83,19 +83,19 @@ any policy goes live; agents never hold a key, never touch mainnet.
    back to the HyperEVM Safe and a pinned CCTP burn to Arbitrum; every
       action confirmed through the precompiles, the node tracker's
    silent-failure report reproduced or ruled out; the refusals; a soak of
-   weeks. Nothing on Hyperliquid goes live before this passes. **Which
-   interface the owner trades in** (owner, 2026-11-12), tried in this
-   order, each with an agent the Safe approved through CoreWriter: a
-   third-party frontend that supports an agent trading for another
-   master, if one exists; the official mobile app through a QR of our
-   own, since its desktop-link flow is a master-signed `approveAgent`
-   whose QR carries the agent key and the master address to the phone,
-   which then natively signs with the agent and reads the master (the
-   payload format is undocumented, so it is reverse-engineered and may
-   change with releases); the official web frontend connected watch-only
-   as the Safe with the agent key seeded in the browser storage it uses,
-   if it accepts a stored key without a fresh approval signature (also
-   undocumented); and, if all else fails, a trading screen in the tracker
+   weeks. Nothing on Hyperliquid goes live before this passes. **Which interface the owner trades in** (owner, 2026-11-12; reordered
+   2026-11-13, Hyperliquid's own interfaces first), tried in this order,
+   each with an agent the Safe approved through CoreWriter: the official
+   mobile app through a QR of our own, since its desktop-link flow is a
+   master-signed `approveAgent` whose QR carries the agent key and the
+   master address to the phone, which then natively signs with the agent
+   and reads the master (the payload format is undocumented, so it is
+   reverse-engineered and may change with releases); the official web
+   frontend connected watch-only as the Safe with the agent key seeded in
+   the browser storage it uses, if it accepts a stored key without a
+   fresh approval signature (also undocumented); then a third-party
+   frontend that supports an agent trading for another master, if one
+   exists; and, if all else fails, a trading screen in the tracker
    (portfolio-tools ADR-014).
 5. **The KMS signer service** (ADR-001, the app's key, slimmed
    2026-11-10: the only identity that can ask KMS to sign; never send
