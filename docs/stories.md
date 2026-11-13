@@ -207,15 +207,18 @@ the signer service. The owner keeps all three keys at home through the testing p
 16. **The policy in force is what the fork suite proved.** Every allowed
     call passes, every must-fail call reverts, on every chain, on every
     change and on a schedule; a policy change ships with its tests.
-20. **The app key never runs out of gas unnoticed, and it never takes
-    more than gas.** The Safe holds some native for gas, which I keep
-    topped up by hand like any of my wallets. The app tops the app key up
-    from the Safe, on a click or on its own under a threshold I set,
-    through a plain native transfer to the app key's address scoped in
-    Roles with a weekly allowance (ADR-001, the app's key); raising or
-    lowering the allowance, or re-pinning the address, is story 2's path.
-    Residual: a week's gas allowance per chain, the one transfer out of
-    the Safe a compromised app can make.
+20. **The app key never runs out of gas unnoticed, and only I can refill
+    it.** The Safe holds some native for gas, which I keep topped up by
+    hand like any of my wallets. The app warns me when the app key's
+    balance is low, when I place an order, on the dashboard and through
+    the monitoring channel, and I top it up from the app with the home
+    key: a plain native transfer to the app key's address, scoped in my
+    own role with a weekly allowance the contract checks (ADR-001, the
+    app's key). The app key cannot call it, so the app never pays itself
+    (owner, 2026-11-13). Raising or lowering the allowance, or re-pinning
+    the address, is story 2's path. Residual: a week's gas allowance per
+    chain, added to what a stolen home key takes; nothing for a
+    compromised app.
 21. **I can create the whole system on a new chain from the app, with my
     three keys at hand, and check it before I fund it.** The app drives
     multisig-ops' versioned setup plan step by step, each step one

@@ -35,7 +35,7 @@ accepted), an **approver** module that
 grants the guard its token approvals, deposits to the owner's Kraken
 account at an address the registry pins per chain (owner, 2026-11-06:
 Kraken's global settings lock makes it another vault of the owner's), a
-wide (30%) band over a short window on sales, a **pause flag** any role member can set, and a weekly gas allowance for the app key as a Roles allowance on a native transfer to its own address (owner, 2026-11-12); the CoW
+wide (30%) band over a short window on sales, a **pause flag** any role member can set, and a weekly gas allowance for the app key as a Roles allowance on a native transfer to its own address, the home key's call alone (owner, 2026-11-12/13); the CoW
 presets out; Hyperliquid: the same Safe on HyperEVM, API wallets for
 trading; the app's key in Cloud KMS; fork tests before
 any policy goes live; agents never hold a key, never touch mainnet.
@@ -58,7 +58,7 @@ any policy goes live; agents never hold a key, never touch mainnet.
    Arbitrum, Ethereum and Robinhood Chain: the guard's functions (swap,
    open, bridge) for the trader role, the position manager's close
    functions with the proceeds pinned to the Safe, the registry's remove,
-   the CoreWriter policy on HyperEVM, the Kraken deposit address pinned per chain, the app key's gas transfer under its weekly Roles allowance, and the must-fail list (ADR-001);
+   the CoreWriter policy on HyperEVM, the Kraken deposit address pinned per chain, the home key's gas transfer to the app key under its weekly Roles allowance, and the must-fail list (ADR-001);
    the
    apply and verify scripts that read the modifier's events (no subgraph
    on Robinhood Chain).

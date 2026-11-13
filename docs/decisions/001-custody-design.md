@@ -100,7 +100,7 @@ session notes):
   address (the Kraken bullet below). Nothing else the role allows sends
   funds to an address that is not the Safe's own (amended 2026-11-05: the
   Hyperliquid deposit hop, the one such transfer, is gone with the native
-  multi-sig; amended 2026-11-06: the Kraken deposit is the one that remains, and it is an exit only into another vault of the owner's; amended 2026-11-12: and the app key's gas, a native transfer to the app key's own address under a weekly Roles allowance, the gas bullet in the app's key section). The token set, the per-pool parameters and
+  multi-sig; amended 2026-11-06: the Kraken deposit is the one that remains, and it is an exit only into another vault of the owner's; amended 2026-11-12: and the app key's gas, a native transfer to the app key's own address, the home key's alone, under a weekly Roles allowance, the gas bullet in the app's key section). The token set, the per-pool parameters and
   the per-period notionals are the registry's, not Roles conditions
   (amended 2026-11-05: Roles scopes calls per target address and cannot
   scope "approve on any token", so a token set in Roles would make every
@@ -782,21 +782,29 @@ session notes):
   up by hand, a swap through the guard or a transfer in; no automation of
   that for now. The app key pays the gas of every role transaction and of
   every Delay entry it executes, and nobody watches its balance, so an
-  automated strategy could stall on an empty key; the app therefore tops
-  the key up from the Safe, on a click or on its own under a threshold
-  the owner sets. The mechanism is Roles' own: a plain native transfer
-  from the Safe to the app key's address, a trader-role call scoped as
-  that one target with Send allowed and an `EtherWithinAllowance`
-  condition on a Roles allowance that refills every week (Roles tracks
-  the balance, the refill and the period itself). No guard function, no
-  registry entry, no unwrapping: the target address in the policy is the
-  pin. Raising or lowering the allowance and re-pinning the address are policy changes, two keys through the Delay (a KMS key version is a new address, but a signing key is rotated only on a suspected compromise, when the new address joins the role through the Delay anyway; the freeze disables and re-enables the same version, same address); the home key may call the transfer too. The fork harness
+  automated strategy could stall on an empty key. The app watches it for
+  the owner (owner, 2026-11-13): it warns when the balance is low, at the
+  moment a new order is placed, on the dashboard and through the
+  monitoring channel, and the owner tops the key up from the app with
+  the home key. The app never tops the key up on its own: the app key is
+  not allowed to call the transfer, which keeps a compromised app from
+  moving anything out of the Safe and spares users a path that looks
+  like the app paying itself. The mechanism is Roles' own: a plain
+  native transfer from the Safe to the app key's address, scoped in the
+  home key's own role (the role `withdrawAllowance` lives in, which the
+  app key is not a member of) as that one target with Send allowed and
+  an `EtherWithinAllowance` condition on a Roles allowance that refills
+  every week, checked by the contract (Roles tracks the balance, the
+  refill and the period itself). No guard function, no registry entry,
+  no unwrapping: the target address in the policy is the pin. Raising or
+  lowering the allowance and re-pinning the address are policy changes,
+  two keys through the Delay (a KMS key version is a new address, but a
+  signing key is rotated only on a suspected compromise, when the new
+  address joins the role through the Delay anyway; the freeze disables
+  and re-enables the same version, same address). The fork harness
   confirms the scoping of an empty-calldata call (Roles evaluates the
   condition tree on a target entry whatever the calldata; on 2.1.1 the
-  entry is keyed under selector `0x00000000`). Residual: the allowance
-  per week per chain, sized for gas (Ethereum higher than the L2s), is
-  the one transfer out of the Safe the app key can make and the most a
-  compromised app can drain; Consequences and story 10 count it.
+  entry is keyed under selector `0x00000000`). Residual: the allowance per week per chain, sized for gas (Ethereum higher than the L2s), is what a stolen home key adds to its take; a compromised app moves nothing out of the Safe; Consequences and story 10 count it.
 - **The signer service** (build step 5; slimmed 2026-11-10 after the
   owner's question of what it buys over the chain's own checks). The
   engine never signs: it sends the signer an intent (chain, account,
@@ -894,7 +902,7 @@ session notes):
    position manager (a partial fill decreased and collected to the Safe, a
    reload cycle as one MultiSend), the bridge permission, the Kraken
    deposit (a `sendToExchange` to the pinned address passes; to any other
-   address reverts; changing the pinned address by the role reverts), the app key's gas (a native transfer to the app key's address passes within the week's allowance and reverts above it; to any other address reverts; the allowance refills after the period), and the must-fail list, with a
+   address reverts; changing the pinned address by the role reverts), the app key's gas (a native transfer to the app key's address by the home key passes within the week's allowance and reverts above it; to any other address reverts; by the app key reverts; the allowance refills after the period), and the must-fail list, with a
    direct router call, a direct `mint`, the position NFT's transfers and
    approvals, an approval to another spender or above the allowance, and a
    `collect` to another recipient among it.
@@ -935,7 +943,7 @@ session notes):
   notional in a pool that clears the floors. It can send the book to the
   owner's Kraken account, where Kraken's global settings lock allows
   withdrawals only to the bank or back to the Safes. It cannot send anything elsewhere, beyond a week of the app key's gas to the app key's own address.
-- **A stolen home key**, with no owner to coerce, takes the degen allowance per cooldown window, by a plain withdrawal, and a week's gas allowance to the app key's address, which is also the most a compromised app can move out of the Safe (2026-11-12). The residuals, each accepted by the owner
+- **A stolen home key**, with no owner to coerce, takes the degen allowance per cooldown window, by a plain withdrawal, and a week's gas allowance to the app key's address (2026-11-12; the app key itself cannot call that transfer, owner 2026-11-13). The residuals, each accepted by the owner
   (2026-11-05): after the three-day whitelisting cooldown, the whitelisted path's
   per-period notional into a pool of the thief's own, unless the vault key
   skips the whitelisting first; and a sandwich of the Safe's
