@@ -53,8 +53,7 @@ any policy goes live; agents never hold a key, never touch mainnet.
    trade and an absolute one through a pricing path), the
    registry (the whitelisted set, per-pool parameters with defaults, the two
    per-period notionals) and the approver, with their fork tests; the
-   whitelisting Delay in front of the registry; and the policies for Base,
-   Arbitrum, Ethereum and Robinhood Chain: the guard's functions (swap,
+   whitelisting Delay in front of the registry; and the policies for Base, Ethereum and Robinhood Chain (Arbitrum dropped 2026-11-13, Base the hub): the guard's functions (swap,
    open, bridge) for the trader role, the position manager's close
    functions with the proceeds pinned to the Safe, the registry's remove,
    the CoreWriter policy on HyperEVM, the Kraken deposit address pinned per chain, the home key's gas transfer to the app key under its weekly Roles allowance, and the must-fail list (ADR-001);
@@ -76,9 +75,9 @@ any policy goes live; agents never hold a key, never touch mainnet.
 4. **Hyperliquid on testnet, the Safe as the account** (decided
    2026-11-05; ADR-001's Verify step 1): the same-address Safe, Roles and
    Delay on HyperEVM testnet; the CoreWriter policy scoped as `Calldata`;
-   a CCTP deposit through the guard, the recipient pinned by it and the allowance debited, credited to the Safe; an API wallet approved through CoreWriter by two keys, then
+   a CCTP deposit through the guard from a Base Sepolia Safe, the recipient pinned by it and the allowance debited, credited to the Safe, the forwarder hook from Base confirmed; an API wallet approved through CoreWriter by two keys, then
    trading through it; a class transfer and a send asset as role calls
-   back to the HyperEVM Safe and a pinned CCTP burn to Arbitrum; every
+   back to the HyperEVM Safe and a pinned CCTP burn to the Base Safe; every
       action confirmed through the precompiles, the node tracker's
    silent-failure report reproduced or ruled out; the refusals; a soak of
    weeks. Nothing on Hyperliquid goes live before this passes. **Which interface the owner trades in** (owner, 2026-11-12; reordered

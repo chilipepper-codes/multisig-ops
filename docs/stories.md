@@ -75,8 +75,7 @@ the signer service. The owner keeps all three keys at home through the testing p
    destination pinned to the Safe's own address on the other chain, no
    cap. The destination is a parameter of the bridge call, so it is in
    the transaction the Safe signs and the guard sets it to its caller;
-   bridges whose recipient lives only in an off-chain quote are not role
-   calls. Residual: none.
+   bridges whose recipient lives only in an off-chain quote are not role calls. A bridge that changes the token on the way, USDG off Robinhood Chain into USDC on the Base Safe through Across, carries an output bound the guard checks near one to one, and refunds to the Safe (2026-11-13); a bundled swap-and-bridge like Jumper is not a role call. Residual: none.
 
 ## Whitelisting
 
@@ -120,7 +119,7 @@ the signer service. The owner keeps all three keys at home through the testing p
     an allowance per window.** The Safe itself is the Hyperliquid account: the same Safe at
     the same address on HyperEVM, where the whole Zodiac stack is
     deployed, controls its HyperCore account through CoreWriter, scoped
-    by Roles with no custom code. A deposit is the guard's `depositToHyperliquid`: a CCTP burn from the Arbitrum Safe with the recipient pinned to the Safe by the guard, which debits the allowance and refuses while paused (amended 2026-11-13), so it is a transfer between the owner's own addresses that the registry sees. Decided 2026-11-05,
+    by Roles with no custom code. A deposit is the guard's `depositToHyperliquid`: a CCTP burn from the Base Safe with the recipient pinned to the Safe by the guard, which debits the allowance and refuses while paused (amended 2026-11-13), so it is a transfer between the owner's own addresses that the registry sees. Decided 2026-11-05,
     validated thoroughly on testnet before any live funds (ADR-001,
     Hyperliquid). The deposit allowance has the same window and controls
     as the degen one, because Hyperliquid trading has no guard: on a thin
@@ -134,7 +133,7 @@ the signer service. The owner keeps all three keys at home through the testing p
     app key), approved through CoreWriter by two keys, trade and cannot
     withdraw by Hyperliquid's own rules. A withdrawal back to the wallet
     is a class transfer, a send asset to the USDC system address and a
-    CCTP burn pinned to the Arbitrum Safe, all role calls between the
+    CCTP burn pinned to the Base Safe, all role calls between the
     owner's own addresses; after that, story 2. The account is never
     converted into a native multi-sig (Hyperliquid's rule: CoreWriter
     does not work for multi-sig users), and it has no key for the 2025

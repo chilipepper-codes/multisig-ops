@@ -66,7 +66,7 @@ session notes):
 
 ## Decision
 
-### EVM chains (Ethereum, Arbitrum, Base, Robinhood Chain)
+### EVM chains (Ethereum, Base, Robinhood Chain; Base is the hub)
 
 - **One funded Safe per chain, at the same address on every chain** (amended
   2026-11-04: the earlier vault Safe is dropped; all on-chain capital is
@@ -261,12 +261,34 @@ session notes):
   - **A bridge** (2026-11-05) pulls any held token, whitelisted or not, and
     calls a whitelisted bridge with the destination pinned to the Safe's own
     address on the other chain; no price check and no cap, since the
-    destination is the owner's. It is in the guard because a bridge needs
+    destination is the owner's. That holds for a same-token bridge. **A
+    cross-token bridge carries an output bound the guard checks** (the
+    tracker session's proposal, 2026-11-13, agreed): leaving Robinhood
+    Chain, whose liquid stablecoin is USDG and where USDC may not be
+    deployed, Across converts USDG into USDC on the way to the Base Safe
+    through Paxos Labs' Transit; the guard's bridge sets the recipient
+    to the Safe, pins the output token to the destination's USDC, bounds
+    the output amount against the input near one to one after decimals
+    by a registry parameter for stable-to-stable routes (a relayer fills
+    exactly the output amount or not at all, so the bound is the
+    outcome), and sets the depositor to the Safe, since an unfilled
+    deposit refunds to the depositor on the origin chain after the fill
+    deadline, which holds for any bridge with a refund address. Jumper
+    is not a role call: LI.FI runs a swap inside the bridge call, and a
+    swap the guard has not checked is an unchecked swap. To confirm on
+    testnet before the route is relied on: whether Transit routes are
+    plain SpokePool deposits with an output token different from the
+    input, or go through a handler and a message, in which case the final
+    recipient is pinned inside the message as the CCTP hook data is. USDG
+    joins the reserve set on Robinhood Chain. The fallback needs no new
+    guard code: a swap of USDG into ETH through the guard, checked
+    against the backstop, then the ETH bridged through the guard to the
+    Base Safe, two transactions the engine runs as one move. It is in the
+    guard because a bridge needs
     an approval on the token, which Roles cannot scope for a token it has
     not whitelisted; the approver grants it. **How the destination is pinned:**
     every bridge worth whitelisting takes the recipient as a parameter of the
-    call itself (CCTP's `mintRecipient`, Across's `recipient`, the
-    Arbitrum gateway's `to`, a DLN order's `receiverDst`), so the value
+    call itself (CCTP's `mintRecipient`, Across's `recipient`, a DLN order's `receiverDst`), so the value
     is in the transaction the Safe signs, and Roles compares it to the
     Safe's address before the call runs; the guard does the same for its
     own bridge function by setting the recipient to its caller. Because
@@ -508,8 +530,7 @@ session notes):
   L2s) and transfers it to that address, nothing else; no price check and
   no cap, since the destination is the owner's. Only on chains Kraken
   accepts (USDC and ETH on Ethereum, Arbitrum, Base, Optimism, Polygon at
-  the time of writing; nothing on Robinhood Chain, so those funds bridge
-  to the Arbitrum Safe first); the engine or the owner checks Kraken's
+  the time of writing; nothing on Robinhood Chain, so those funds bridge to the Base Safe first); the engine or the owner checks Kraken's
   current networks before each pin or list entry.
   Operational rules that carry the whole safety of this path: the lock
   stays on, with a long unlock wait; the destination allowlist at Kraken
@@ -527,8 +548,7 @@ session notes):
   position earns the pool fee from the flow that fills it. The open goes
   through the guard (above), which mints the position to the Safe on any
   position manager the registry whitelists (Uniswap v3's
-  NonfungiblePositionManager; Aerodrome Slipstream on Base; PancakeSwap
-  v3; Camelot on Arbitrum; Uniswap v4's PositionManager, open and close
+  NonfungiblePositionManager; Aerodrome Slipstream on Base; PancakeSwap v3; Uniswap v4's PositionManager, open and close
   both through the guard). The close has
   no price exposure, so it is the Safe's own call on the manager, allowed
   by the role directly: `decreaseLiquidity` (moves nothing); `collect` with
@@ -688,7 +708,7 @@ session notes):
   the Hyperliquid balance plus one allowance per window. Same bookkeeping
   and controls as the degen allowance: a rolling window equal to the owner
   path's cooldown, lowering a trader-role call, raising two keys through
-  the Delay; withdrawals back to the Safe uncapped. Rails, best first: (1) **CCTP v2 with Circle's forwarder, through the guard's `depositToHyperliquid`**: one transaction from the Arbitrum Safe (Arbitrum joins the tracker's chains for it, portfolio-tools ADR-014, owner 2026-11-12); the guard pulls the USDC (the approver grants it), calls `depositForBurnWithHook` with the mint recipient and destination caller pinned to Circle's forwarder on HyperEVM and the HyperCore recipient set by the guard to its caller, the Safe, in the hook data, which the forwarder deposits for the Safe into perp or spot; the guard debits the registry's deposit allowance and refuses while paused, so the allowance is a contract check like the degen one, and no Roles bitmask on the hook data is needed; Circle's canonical contracts end to end, no aggregator, no solver. (2) **Plain CCTP to the HyperEVM Safe through the same guard function**, then the Safe's own deposit for itself through Circle's `CoreDepositWallet.depositFor` as a HyperEVM role call with the recipient pinned to the Safe: two transactions, same trust, the allowance debited at the burn. (3) **The native bridge from Arbitrum** credits the sender, which through the guard would be the guard itself, so it is not a role call any more; it stays an owner-path option, if ever. From other chains, first to the Arbitrum Safe over a bridge with the destination pinned, then (1). Aggregators (Across's
+  the Delay; withdrawals back to the Safe uncapped. Rails, best first: (1) **CCTP v2 with Circle's forwarder, through the guard's `depositToHyperliquid`**: one transaction from the Base Safe (owner, 2026-11-13: Base is the hub; Circle's CCTP deposits to HyperCore work from any CCTP chain, so Arbitrum, which only the native bridge required, is dropped from the design with its Safe, modules, policy and fork tests; Circle's gas-sponsored extension is Arbitrum-only, so a deposit from Base pays CCTP's own fee as well as the forwarder's, small at trading size, and the forwarder hook from Base specifically is confirmed on testnet); the guard pulls the USDC (the approver grants it), calls `depositForBurnWithHook` with the mint recipient and destination caller pinned to Circle's forwarder on HyperEVM and the HyperCore recipient set by the guard to its caller, the Safe, in the hook data, which the forwarder deposits for the Safe into perp or spot; the guard debits the registry's deposit allowance and refuses while paused, so the allowance is a contract check like the degen one, and no Roles bitmask on the hook data is needed; Circle's canonical contracts end to end, no aggregator, no solver. (2) **Plain CCTP to the HyperEVM Safe through the same guard function**, then the Safe's own deposit for itself through Circle's `CoreDepositWallet.depositFor` as a HyperEVM role call with the recipient pinned to the Safe: two transactions, same trust, the allowance debited at the burn. (3), the native bridge, is gone: it existed only from Arbitrum and credited the sender, which through the guard would be the guard itself. From other chains, first to the Base Safe over a bridge with the destination pinned, then (1). Aggregators (Across's
   `HyperliquidDepositHandler`, LI.FI's Polymer CCTP facet, deBridge's
   orders) also carry the recipient in calldata, but their contracts and
   relayers join the trust path for nothing (LI.FI's facet is route (1)
@@ -698,14 +718,12 @@ session notes):
   met for Hyperliquid, which the native multi-sig never could: a USD
   class transfer to spot, a send asset to the USDC system address (paid
   out by an ERC-20 transfer to the sender's own HyperEVM address, the
-  Safe), and a CCTP burn from the HyperEVM Safe with the mint recipient
-  pinned to the Arbitrum Safe. All transfers between the owner's own
-  addresses, all role calls. Leaving the Safe system stays the two-key
+  Safe), and a CCTP burn from the HyperEVM Safe with the mint recipient pinned to the Base Safe. All transfers between the owner's own addresses, all role calls. Leaving the Safe system stays the two-key
   delayed path as everywhere.
 - **Exposure and failure modes, stated squarely.** The account's funds
   depend on CoreWriter accepting the Safe's actions and on the USDC link
   between HyperCore and HyperEVM (the system address and Circle's deposit
-  wallet), since CoreWriter has no direct withdrawal to Arbitrum. Both are
+  wallet), since CoreWriter has no direct withdrawal to another chain. Both are
   Hyperliquid-operated mechanisms that the whole HyperEVM ecosystem
   depends on (Hyperliquid steers vault protocols to exactly this pattern;
   Circle's forwarder, Across's handler and LI.FI's facet run on it in
@@ -845,11 +863,10 @@ session notes):
 ### Verify before real funds
 
 1. Hyperliquid testnet, the Safe as the account: the same-address Safe,
-   Roles and Delay deployed on HyperEVM testnet; a CCTP deposit through the guard from the Arbitrum testnet Safe, the recipient pinned by the guard, credited to the Safe's HyperCore account and debited from the allowance; a deposit above the allowance, and one while paused, reverts; a role call straight to CCTP reverts; an API wallet approved through CoreWriter by
+   Roles and Delay deployed on HyperEVM testnet; a CCTP deposit through the guard from the Base Sepolia Safe (the forwarder hook from Base confirmed here), the recipient pinned by the guard, credited to the Safe's HyperCore account and debited from the allowance; a deposit above the allowance, and one while paused, reverts; a role call straight to CCTP reverts; an API wallet approved through CoreWriter by
    two keys, then trading through it from the app and from the web UI; a
    class transfer and a send asset to the system address as role calls,
-   the USDC landing on the HyperEVM Safe, and a pinned CCTP burn back to
-   the Arbitrum Safe; every CoreWriter action confirmed through the
+   the USDC landing on the HyperEVM Safe, and a pinned CCTP burn back to the Base Safe; every CoreWriter action confirmed through the
    precompiles, with the silent-failure report on the node tracker
    reproduced or ruled out; a send asset to any other destination, and an
    add API wallet by the role, refused by Roles; a soak of weeks before any
