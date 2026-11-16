@@ -6,47 +6,127 @@ built yet (2026-10-24).
 
 ## Decided (ADR-001)
 
-EVM: two Safes per chain, Roles + Delay on the trading one, one trader role
-for the home Ledger and the app's KMS key, scoped to swaps, bridges, the
-Hyperliquid deposit and (amended 2026-11-02) CLMM range orders, the
-execution engine's resting limit orders as single-sided positions owned by
-the Safe; Hyperliquid: native multi-sig with API wallets; the app's key in
-Cloud KMS; fork tests before any policy goes live; agents never hold a key,
-never touch mainnet.
+The user stories in [`docs/stories.md`](stories.md) are the spec
+(owner, 2026-11-05). EVM: one funded Safe per chain (amended 2026-11-04:
+the vault Safe is dropped, all on-chain capital trades), three owner keys
+at **3 of 3 for the direct path** and a fundless 2-of-3 Safe queuing
+every other owner action through the Delay (decided 2026-11-05), Roles on
+it, one trader role for
+the home Ledger and the app's KMS key, scoped to swaps and CLMM
+range-order opens through **the guard** (decided 2026-11-04: an admin-less,
+unowned contract that checks a trade's outcome against the caller's
+minimum, shown to the owner before signing, and, where the token has a
+backstop pool with a free oracle, against its time-weighted price and
+depth, and delivers everything to the Safe, through any whitelisted
+router, so every AMM is reachable, Uniswap v2, v3 and v4 and Aerodrome
+among them; amended 2026-11-09),
+range-order closes, bridges, and on HyperEVM
+the CoreWriter actions of the Safe's own Hyperliquid account (decided
+2026-11-05: the Safe is the account, fed by CCTP with the recipient
+pinned, validated on testnet before live funds; the native multi-sig is
+out), and the degen allowance, one rolling cooldown window, spent on
+non-whitelisted buys or withdrawn to any address with the home key (the
+one priced exit, handed over under duress by design; owner, 2026-11-09); the token set, the
+per-pool parameters and the per-period notionals in a **registry** the
+guard reads, where the home key alone can add a token behind a **whitelisting
+Delay** owned by the vault key (both Delays configurable by their owners,
+three days by default, owner 2026-11-10; the whitelisting attack
+accepted), an **approver** module that
+grants the guard its token approvals, deposits to the owner's Kraken
+account at an address the registry pins per chain (owner, 2026-11-06:
+Kraken's global settings lock makes it another vault of the owner's), a
+wide (30%) band over a short window on sales, a **pause flag** any role member can set, and a weekly gas allowance for the app key as a Roles allowance on a native transfer to its own address, the home key's call alone (owner, 2026-11-12/13); the CoW
+presets out; Hyperliquid: the same Safe on HyperEVM, API wallets for
+trading; the app's key in Cloud KMS; fork tests before
+any policy goes live; agents never hold a key, never touch mainnet.
 
 ## Build order (EVM + Hyperliquid)
 
 1. **The fork test harness**: a Safe + Roles + Delay deployment on a fork of
    each chain, a policy applied, the allowed list passing and the must-fail
    list reverting. The acceptance test everything else is measured against.
-2. **Policy as code** for Base, Arbitrum, Ethereum (CoW presets, for the
-   owner's own swaps through Pilot) and Robinhood Chain (SwapRouter02 with
-   the recipient pinned, the native bridge, the Hyperliquid deposit transfer
-   under its allowance), plus, on every chain, the **position manager**
-   target for the engine's CLMM range orders (ADR-001: mint and collect
-   pinned to the Safe, the NFT's transfers and approvals, `multicall` and
-   the sweeps on the must-fail list; v3-shaped managers only, v4 waits on
-   step 7); the apply and verify scripts that read the modifier's events
-   (no subgraph on Robinhood Chain).
-3. **Same-address Safes by script**, the Delay cooldown, a role call through
-   Rabby with the Ledger — on testnets first.
-4. **Hyperliquid on testnet**: the multi-sig conversion, agent approval
-   through the multi-sig, trading through the agent, a withdrawal refusing
-   one signature. The multisig UI: Hyperliquid's own, or the open-source
-   signer.
-5. **The KMS signer service** and the tracker's intent API, whose intents
-   include opening, reloading and closing a range order (a reload cycle is
-   one MultiSend role call); the executor's bad-trade residual bounded by
-   the token list, the allowances (sized for the churn of reloads) and the
-   engine's checks.
-6. **Go live in stages**: the trading Safe with threshold 1 for a week,
-   then the vault key and threshold 2; Hyperliquid last, since conversion is
-   one-way.
-7. **Measure the v4-only share** of the Robinhood Chain flow for a few
-   weeks, swaps and the pairs the engine would rest range orders in, then
-   decide between Universal Router conditions and the guarded swapper
-   (ADR-001); a guarded contract, if built, gets the range-order variant
-   that checks the range against the pool price.
+2. **The guard, the registry, the approver and the policy as code.** The
+   guard (swap by outcome check against the caller's minimum through any
+   whitelisted router, range-order open and v4 close, bridge, Hyperliquid deposit, send to exchange, withdraw allowance; the backstop's read adapters for the
+   free-oracle kinds only: Uniswap v3 and forks, Aerodrome v2-style,
+   Algebra; deviation band, tick distance, a depth floor relative to the
+   trade and an absolute one through a pricing path), the
+   registry (the whitelisted set, per-pool parameters with defaults, the two
+   per-period notionals) and the approver, with their fork tests; the
+   whitelisting Delay in front of the registry; and the policies for Base, Ethereum and Robinhood Chain (Arbitrum dropped 2026-11-13, Base the hub): the guard's functions (swap,
+   open, bridge) for the trader role, the position manager's close
+   functions with the proceeds pinned to the Safe, the registry's remove,
+   the CoreWriter policy on HyperEVM, the Kraken deposit address pinned per chain, the home key's gas transfer to the app key under its weekly Roles allowance, and the must-fail list (ADR-001);
+   the
+   apply and verify scripts that read the modifier's events (no subgraph
+   on Robinhood Chain).
+3. **Same-address Safes by script, published as the setup plan** (owner,
+   2026-11-12): the funded Safe at 3 of 3 and the 2-of-3 Safe on its
+   Delay, created at their final thresholds with all three keys at hand,
+   the Delay cooldowns (the owner path's, owned by the funded Safe; the
+   whitelisting Delay's, owned by the vault key), the policy, the pins
+   and the allowances, as the versioned, hash-pinned plan the tracker's
+   onboarding drives (portfolio-tools ADR-014), with the verify script
+   (the read-back and the must-fail list on a fork, once per Safe); a
+   role call and a queued whitelisting through Rabby with the Ledger — on
+   testnets first. HyperEVM (2026-11-05) and Robinhood Chain (2026-11-12)
+   hold the Safe 1.4.1 stack, Roles 2.1.1, Delay 1.1.1 and the factories
+   at their canonical addresses, read from the chain.
+4. **Hyperliquid on testnet, the Safe as the account** (decided
+   2026-11-05; ADR-001's Verify step 1): the same-address Safe, Roles and
+   Delay on HyperEVM testnet; the CoreWriter policy scoped as `Calldata`;
+   a CCTP deposit through the guard from a Base Sepolia Safe, the recipient pinned by it and the allowance debited, credited to the Safe, the forwarder hook from Base confirmed; an API wallet approved through CoreWriter by two keys, then
+   trading through it; a class transfer and a send asset as role calls
+   back to the HyperEVM Safe and a pinned CCTP burn to the Base Safe; every
+      action confirmed through the precompiles, the node tracker's
+   silent-failure report reproduced or ruled out; the refusals; a soak of
+   weeks. Nothing on Hyperliquid goes live before this passes. **Which interface the owner trades in** (owner, 2026-11-12; reordered
+   2026-11-13, Hyperliquid's own interfaces first), tried in this order,
+   each with an agent the Safe approved through CoreWriter: the official
+   mobile app through a QR of our own, since its desktop-link flow is a
+   master-signed `approveAgent` whose QR carries the agent key and the
+   master address to the phone, which then natively signs with the agent
+   and reads the master (the payload format is undocumented, so it is
+   reverse-engineered and may change with releases); the official web
+   frontend connected watch-only as the Safe with the agent key seeded in
+   the browser storage it uses, if it accepts a stored key without a
+   fresh approval signature (also undocumented); then a third-party
+   frontend that supports an agent trading for another master, if one
+   exists; and, if all else fails, a trading screen in the tracker
+   (portfolio-tools ADR-014).
+5. **The KMS signer service** (ADR-001, the app's key, slimmed
+   2026-11-10: the only identity that can ask KMS to sign; never send
+   twice; `withdrawAllowance` refused outright; the order policy for
+   Hyperliquid, which has no on-chain guard; the freeze as a runbook
+   entry, revoking the KMS permission; no EVM allowlist, caps or price
+   check, since the chain is the policy there) and the tracker's intent
+   API, whose intents include opening, reloading and closing a range
+   order (a reload cycle is one MultiSend role call); the executor's
+   bad-trade residual bounded by the registry's whitelisted set and
+   notionals, the signer's checks and the engine's checks.
+6. **The audit** of the guard, the registry and the approver, its findings
+   closed in the fork suite, before any real funds pass through them.
+7. **Monitoring** (owner, 2026-11-05: yes; shape decided 2026-11-13: the
+   tracker's). The tracker's scheduled job reads both Delays, Roles, the
+   registry and the guard every few minutes and alerts on the dashboard
+   and by push for anything the owner did not start: a whitelisting or
+   re-point queued, any Delay entry, a role execution matching no order,
+   a Kraken deposit, an allowance withdrawal, a pause. A coerced
+   whitelisting is delayed and visible rather than refused, and the veto
+   is worth nothing unseen, so one independent channel outside the app,
+   set up once by the owner on the Safe and module addresses, backs it:
+   a compromised app hides its own alerts. This repository's part is the
+   event catalogue the job reads (both Delays' `TransactionAdded`, Roles'
+   executions, the registry's and the guard's events) and the runbook
+   for the independent channel per chain, with the alert services'
+   coverage of Robinhood Chain and HyperEVM checked first, since the
+   mainstream ones may not list them.
+8. **Go live in stages** (owner, 2026-11-12): the Safes at their final
+   thresholds from the first transaction, with all three keys kept at
+   home through the testing period; every story exercised with small
+   funds until the owner is confident; then the vault and third keys go
+   to their locations and the book moves in; Hyperliquid last, after
+   step 4's soak, with the balance at trading size.
 
 ## Queued, no decision made
 
@@ -71,18 +151,65 @@ decided and another solution possible when the work is taken up:
   the executor; Squads' program and app are theirs; a custom policy program
   would be ours to deploy and audit.
 
+### Polymarket, its own PR after this one (owner, 2026-11-13)
+The shape is agreed, the ADR section and the story are not written. A
+Polymarket **Deposit Wallet owned by the vault key**: the home key cannot
+withdraw from it, so under duress or with a stolen home key nothing
+leaves Polymarket; the app trades through a **session key**, a KMS
+signature under the signer's order policy, which Polymarket's rule keeps
+from withdrawing (renewed by the vault key at a fixed 180 days, batched
+with its other visits); the **Polygon Safe** (Polygon joins the chains)
+feeds it through a pinned destination under a **Polymarket deposit
+allowance** with the Hyperliquid one's window and controls; every
+withdrawal back is a vault-key action, so the balance is sized for a bank
+trip; a lost vault key loses that balance, accepted as understood.
+Residual: a sale into an attacker's own bid with the session key, bounded
+by the balance plus one allowance per window. Manual trading goes through
+the app's screen or a third-party frontend that accepts a session key,
+since polymarket.com logs in as the owner. Checks on Polygon's Amoy
+testnet first: a Ledger-held owner signing the wallet's EIP-712 batches;
+whether a Deposit Wallet has any owner-change or recovery path; what the
+owner's Relayer API key can do without the owner's signature. The Safe as
+the Polymarket account itself (the V2 exchange accepts ERC-1271 makers)
+waits on Roles v3's typed-message signing and on Polymarket's order API
+accepting a maker that is not one of its wallets: an idea below.
+
 ### Ideas, not committed
 - **Hyperliquid withdrawal whitelist**: ask Hyperliquid for a destination
-  allowlist on `withdraw3`; it would give the home-key-only withdrawal the
+  whitelist on `withdraw3`; it would give the home-key-only withdrawal the
   design cannot offer today.
-- **UniswapX intents through the Safe** once Roles v3 ships its typed-message
-  signing library, as a second swap path on Robinhood Chain that needs no
-  router conditions.
-- **The guarded swapper** as a product-grade component (audited, any router,
-  any chain) if the measurement in step 7 says v4-only pools matter.
-- **Monitoring**: an alert on every role execution and every Delay queue
-  entry (Tenderly, OpenZeppelin Defender or our own watcher), so a coerced
-  or compromised use is seen within minutes.
+- **UniswapX intents, and Polymarket orders with the Safe as the maker,
+  through the Safe** once Roles v3 ships its typed-message signing
+  library: UniswapX as a second swap path on Robinhood Chain that needs
+  no router conditions; Polymarket when its order API accepts a maker
+  that is not one of its own wallets (the V2 exchange contract already
+  accepts ERC-1271).
+- **External feeds on the guard** (Chainlink, Pyth) as a sanity check on a
+  tokenized stock's pricing hop, where a feed is deployed on the chain;
+  never a dependency (ADR-001, the guard).
+- **An off-site guardian** as the whitelisting Delay's owner, a third party who
+  can veto a queued whitelisting alone while the owner is held; today the
+  owner holds all three keys and the Delay's owner is the vault key
+  (ADR-001).
+- **Keepers for reference prices without a free oracle** (owner,
+  2026-11-09: only if practice shows tokens of interest with no
+  free-oracle pool; until then such tokens cannot be whitelisted and stay
+  under the degen allowance, owner 2026-11-10): Uniswap v2 pairs through their cumulative
+  accumulators against registry snapshots, Uniswap v4 pools through
+  sampled observations by designated keepers (ADR-001, the guard).
+- **Probation for new whitelistings**: a token whitelisted from the home key keeps
+  counting against the degen allowance for its first days, closing the
+  whitelisting attack the owner accepted (ADR-001); a timestamp in the
+  registry if ever wanted.
+- **The signer in Confidential Space**, with the KMS permission bound to
+  the attested container image, so that even the project's own cloud
+  credentials cannot call the key from anywhere else; hardening, not
+  needed for version one (owner's question, 2026-11-10).
+- **A Ledger clear-signing descriptor** (ERC-7730) for the guard's calls,
+  accepted into Ledger's registry, so the hardware screen shows the input
+  and the minimum instead of a blind-signing hash; low priority, perhaps
+  only for a commercial launch (owner, 2026-11-10); until then Rabby's
+  simulation is the pre-sign defence.
 - **Scheduled policy drift checks**: the fork suite on a schedule against
   the live policy, since routers and protocols move.
 - **A wrench-attack and key-loss drill**: a written runbook and a dry run

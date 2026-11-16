@@ -7,4 +7,4 @@ when a decision is superseded. Format: Context / Decision / Consequences.
 
 | ADR | Decision |
 |---|---|
-| [001](001-custody-design.md) | Wrench-resistant self-custody for the trading book: two Safes per EVM chain with Zodiac Roles and Delay on the trading one, Hyperliquid's native multi-sig with API wallets for trading, a Cloud KMS key for the app's executions; Solana proposed, not decided |
+| [001](001-custody-design.md) | Wrench-resistant self-custody for the trading book: one funded Safe per EVM chain with Zodiac Roles (and Delay, if chosen) on it, a guard contract in front of every swap and range-order open reading a token registry the home key can add to behind a Delay, the same Safe on HyperEVM as the Hyperliquid account through CoreWriter with API wallets for trading, a Cloud KMS key for the app's executions; Solana proposed, not decided |
