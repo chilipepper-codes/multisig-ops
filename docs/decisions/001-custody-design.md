@@ -44,7 +44,16 @@ session notes):
   (Roles 2.1.0 / Delay 1.1.0; exposed only setups where a *Safe* was a role
   member or an enabled module; patched 2.1.1 / 1.1.1 on June 19) and a
   MultiSend-unwrapper bypass (needed an existing role member; fixed, the app
-  migrates). Roles v3 is audited (Oct 2026) but unreleased.
+  migrates). Roles v3 is audited (Oct 2026) but unreleased. On 2026-11-16 a
+  Safe lost about $6.4M through its Roles module with no contract bug: its
+  role scoped ParaSwap swaps on the beneficiary and the output token but
+  left the `executor` field open, the address that receives the input
+  tokens to carry out the trade, so the role's key named its own wallet
+  there and kept the input (The Defiant, disco_trooper's analysis). A
+  calldata-scoped permission is only as complete as the list of fields
+  that can move funds; this design's answer is below (the guard checks
+  the outcome on the Safe's balances instead of the route's fields, and
+  every call that stays a direct role call is scoped field by field).
 - Hyperliquid has two permission levels only: the account key (everything,
   including `withdraw3` to any destination) and API wallets (trade only, no
   withdrawals or transfers). Its native multi-sig applies the threshold to
@@ -854,8 +863,27 @@ session notes):
   depth allows, a pricing hop under its floor, a buy of a non-whitelisted token
   above the degen allowance or in a pool under the absolute floor or
   quoted in another non-whitelisted token),
-  on every chain, on every policy change and on a schedule. Policy is code that fails
-  silently; this is what makes it safe to change.
+  on every chain, on every policy change and on a schedule. Policy is code that fails silently; this is what makes it safe to change.
+  **The swap path is not exposed to a field left open** (checked
+  2026-11-16 against the ParaSwap `executor` drain): the role allows no
+  router call and no approval to anything but the guard, and the guard
+  judges a swap by what the Safe's balances show afterwards, not by what
+  the calldata names, so a route that hands the input to another address
+  fails the outcome check unless the caller also set the minimum to
+  nothing, where the backstop band and the allowances already bound a
+  stolen key or a compromised executor. **The calls that stay direct role
+  calls are where that class of mistake can still hide**, and each is
+  scoped field by field in the policy with the fork suite proving it: the
+  position manager's `decreaseLiquidity`, `collect` and `burn`, every
+  address field pinned to the Safe and a zero recipient refused (on
+  Uniswap v3 a zero recipient means the manager itself, whose balance
+  anyone can sweep), and its `multicall`, `sweepToken`, `unwrapWETH9` and
+  the NFT's transfers and approvals refused; Circle's `depositFor` on
+  HyperEVM, its recipient pinned; every CoreWriter action by whole
+  payload, every destination field pinned; the registry's remove; the
+  Delays' execute; the gas transfer, a pinned target with empty calldata.
+  Any new direct role call enters the policy with its full parameter list
+  written out and a must-fail case per address field.
 - Build on Roles 2.1.1 and Delay 1.1.1 with the current unwrapper; migrate to
   v3 only after it has been in production elsewhere. Subscribe to Zodiac's
   security page.
